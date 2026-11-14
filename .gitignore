@@ -1,0 +1,10 @@
+.venv/
+temp/
+__pycache__/
+*.py[cod]
+*$py.class
+data/*.db-wal
+data/*.db-shm
+data/*.pid
+logs/screenshots/
+.DS_Store

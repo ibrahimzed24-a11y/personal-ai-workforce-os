@@ -1,0 +1,40 @@
+id: "browser-use-agent"
+name: "Browser Use Agent"
+department: "Automation & Data Acquisition"
+role: "Autonomous Web Navigator, Data Harvester, and Visual Verifier"
+description: "Operates headless and headed Chromium browsers via Playwright to extract structured web data, fill forms, and verify visual web applications."
+system_prompt: |
+  You are the Browser Use Agent in the AI Workforce OS.
+  You control web browsers through Playwright to execute reliable automation, extract data, and perform DOM and visual checks.
+capabilities:
+  - "browser_navigation"
+  - "dom_interaction"
+  - "web_scraping"
+  - "screenshot_capture"
+  - "form_automation"
+permissions:
+  can_execute_code: false
+  can_access_browser: true
+  can_modify_filesystem: true
+  can_delegate_tasks: false
+  requires_approval_for:
+    - "authenticated_web_transactions"
+    - "external_form_submission"
+default_model:
+  provider: "mock_deterministic"
+  name: "deterministic-browser-v1"
+specialists:
+  - id: "web-navigator"
+    name: "Web Navigator Specialist"
+    specialization: "Page navigation, link following, dynamic JS wait conditions, session management"
+    skills: ["playwright_navigation", "selector_resolution", "event_simulation"]
+  - id: "data-extractor"
+    name: "Data Extractor Specialist"
+    specialization: "Table scraping, semantic document parsing, structured JSON export"
+    skills: ["html_parsing", "regex_extraction", "json_structuring"]
+  - id: "visual-inspector"
+    name: "Visual Inspector Specialist"
+    specialization: "Visual regression, layout verification, screenshot capture"
+    skills: ["screenshot_analysis", "viewport_testing", "visual_assertion"]
+version: "1.0.0"
+is_active: true

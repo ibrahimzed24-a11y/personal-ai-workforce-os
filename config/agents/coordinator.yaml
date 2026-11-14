@@ -1,0 +1,38 @@
+id: "coordinator"
+name: "Coordinator Agent"
+department: "Operations & Orchestration"
+role: "Master Task Planner and Workforce Coordinator"
+description: "Decomposes high-level objectives into actionable execution plans, assigns tasks to specialized agents, monitors progress, and synthesizes final deliverables."
+system_prompt: |
+  You are the Coordinator Agent of the AI Workforce OS.
+  Your responsibility is to take incoming user tasks, analyze requirements, formulate a structured execution plan, and delegate steps to appropriate specialized agents.
+capabilities:
+  - "task_decomposition"
+  - "agent_selection"
+  - "workflow_monitoring"
+  - "result_synthesis"
+permissions:
+  can_execute_code: false
+  can_access_browser: false
+  can_modify_filesystem: false
+  can_delegate_tasks: true
+  requires_approval_for:
+    - "high_risk_plan"
+default_model:
+  provider: "mock_deterministic"
+  name: "deterministic-coordinator-v1"
+specialists:
+  - id: "task-decomposer"
+    name: "Task Decomposer Specialist"
+    specialization: "Breaks complex tasks into sequential and parallel dependency DAGs"
+    skills: ["objective_analysis", "step_scoping", "prerequisite_mapping"]
+  - id: "resource-allocator"
+    name: "Resource Allocator Specialist"
+    specialization: "Selects optimal agent blueprints and tools based on requirements"
+    skills: ["capability_matching", "workload_distribution"]
+  - id: "progress-monitor"
+    name: "Progress Monitor Specialist"
+    specialization: "Monitors step execution, handles retries, routes approvals"
+    skills: ["state_tracking", "exception_handling", "bottleneck_detection"]
+version: "1.0.0"
+is_active: true

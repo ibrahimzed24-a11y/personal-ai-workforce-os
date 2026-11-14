@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Workforce OS — Control Center</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-mark">⚡</div>
+                <div class="brand-text">
+                    <h1>AI Workforce OS</h1>
+                    <span class="badge online">Local Workstation</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="tasks">
+                    <span class="icon">📋</span> Tasks & Execution
+                </button>
+                <button class="nav-item" data-tab="agents">
+                    <span class="icon">🤖</span> Agent Blueprints
+                </button>
+                <button class="nav-item" data-tab="security">
+                    <span class="icon">🔒</span> Security & Credentials
+                </button>
+                <button class="nav-item" data-tab="integrator">
+                    <span class="icon">🔄</span> System Integrator
+                </button>
+                <button class="nav-item" data-tab="requirements">
+                    <span class="icon">⚙️</span> Requirements Engine
+                </button>
+                <button class="nav-item" data-tab="events">
+                    <span class="icon">📜</span> System Event Log
+                </button>
+            </nav>
+
+            <div class="system-status-widget">
+                <div class="status-row">
+                    <span class="label">Host:</span>
+                    <span class="val">Intel x86_64</span>
+                </div>
+                <div class="status-row">
+                    <span class="label">Database:</span>
+                    <span class="val">SQLite (WAL)</span>
+                </div>
+                <div class="status-row">
+                    <span class="label">Vault:</span>
+                    <span class="val">AES-128-CBC (0600)</span>
+                </div>
+                <div class="status-row">
+                    <span class="label">Engine:</span>
+                    <span class="val">Python 3.12 (uv)</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content View -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="topbar">
+                <div class="breadcrumb" id="currentTabTitle">Tasks & Execution</div>
+                <div class="actions">
+                    <button class="btn btn-secondary" onclick="window.refreshActiveTab()">⟳ Refresh</button>
+                    <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewTaskModal()">+ Create Task</button>
+                </div>
+            </header>
+
+            <!-- Tab 1: Tasks -->
+            <section id="tasksTab" class="tab-pane active">
+                <div class="split-view">
+                    <!-- Task List -->
+                    <div class="panel list-panel">
+                        <div class="panel-header">
+                            <h2>Task Queue</h2>
+                            <span class="task-count" id="taskCountBadge">0 tasks</span>
+                        </div>
+                        <div class="task-list" id="taskListContainer">
+                            <div class="empty-state">No tasks created yet. Click "+ Create Task" to begin.</div>
+                        </div>
+                    </div>
+
+                    <!-- Task Detail & Live Execution Viewer -->
+                    <div class="panel detail-panel">
+                        <div class="panel-header">
+                            <h2>Execution Inspector</h2>
+                            <div id="taskStatusBadges"></div>
+                        </div>
+                        <div class="detail-content" id="taskDetailContainer">
+                            <div class="empty-state">Select a task from the queue to view its execution plan and live progress.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 2: Agents & Specialists -->
+            <section id="agentsTab" class="tab-pane">
+                <div class="panel full-panel">
+                    <div class="panel-header">
+                        <h2>Configurable Agent Organization</h2>
+                        <span class="tag">8 Core Agents Registered</span>
+                    </div>
+                    <div class="agent-grid" id="agentGridContainer">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 3: Security & Credentials Vault -->
+            <section id="securityTab" class="tab-pane">
+                <div class="panel full-panel" style="display:flex; flex-direction:column; gap:16px;">
+                    <!-- Health Stats -->
+                    <div class="stats-row" id="securityStatsRow">
+                        <div class="stat-box">
+                            <span class="stat-num" id="statTotalAccounts">0</span>
+                            <span class="stat-label">Total Accounts</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-num" id="statMfaDisabled" style="color:var(--warning);">0</span>
+                            <span class="stat-label">MFA Disabled</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-num" id="statStalePass" style="color:var(--accent);">0</span>
+                            <span class="stat-label">Stale Passwords (>90d)</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-num" id="statVaultStatus" style="font-size:13px; color:var(--success);">ACTIVE</span>
+                            <span class="stat-label">Vault Storage</span>
+                        </div>
+                    </div>
+
+                    <!-- Sub Navigation -->
+                    <div class="sub-nav-bar">
+                        <div class="tabs-sub">
+                            <button class="btn-sub active" id="secSubBtnAccounts" onclick="window.switchSecuritySubTab('accounts')">Accounts Inventory</button>
+                            <button class="btn-sub" id="secSubBtnRegistrations" onclick="window.switchSecuritySubTab('registrations')">Account Requests</button>
+                            <button class="btn-sub" id="secSubBtnMonitoring" onclick="window.switchSecuritySubTab('monitoring')">Security Monitoring</button>
+                            <button class="btn-sub" id="secSubBtnAudit" onclick="window.switchSecuritySubTab('audit')">Audit History</button>
+                        </div>
+                        <button class="btn btn-primary" onclick="window.openNewAccountModal()">+ Add Account</button>
+                    </div>
+
+                    <!-- Subtab 1: Accounts Inventory -->
+                    <div id="secSubAccounts" class="sec-sub-pane">
+                        <div class="filter-bar">
+                            <input type="text" id="secSearchInput" class="input-field" placeholder="Search accounts, URLs, usernames..." oninput="window.filterAccounts()">
+                            <select id="secCategoryFilter" class="input-field" onchange="window.filterAccounts()">
+                                <option value="">All Categories</option>
+                                <option value="ai_tools">AI Tools & Platforms</option>
+                                <option value="research_seo">Research & SEO</option>
+                                <option value="marketing">Marketing Platforms</option>
+                                <option value="social_media">Social Media</option>
+                                <option value="hosting_domains">Hosting & Domains</option>
+                                <option value="development">Development Platforms</option>
+                                <option value="cloud_infra">Cloud Infrastructure</option>
+                                <option value="analytics">Analytics</option>
+                                <option value="communication">Communication</option>
+                                <option value="business_apps">Business Applications</option>
+                                <option value="personal">Personal Accounts</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="accounts-grid" id="accountsGridContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Subtab 2: Registrations -->
+                    <div id="secSubRegistrations" class="sec-sub-pane" style="display:none;">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Agent Account Registration Requests</h3>
+                                <p class="subtext">Owner approval required before creating new external subscriptions or services.</p>
+                            </div>
+                        </div>
+                        <div class="req-list" id="registrationsListContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Subtab 3: Security Monitoring -->
+                    <div id="secSubMonitoring" class="sec-sub-pane" style="display:none;">
+                        <div class="panel-header">
+                            <h3>Credential Health & Posture Analysis</h3>
+                        </div>
+                        <div id="securityRecommendationsContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Subtab 4: Audit History -->
+                    <div id="secSubAudit" class="sec-sub-pane" style="display:none;">
+                        <div class="panel-header">
+                            <h3>Credential Access Audit Trail</h3>
+                            <span class="subtext">Append-only security log</span>
+                        </div>
+                        <div class="event-stream" id="securityAuditLogContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 4: System Integrator & Update Agent -->
+            <section id="integratorTab" class="tab-pane">
+                <div class="integrator-grid">
+                    <!-- Left: Incoming Assets Scanner -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Incoming Capabilities Queue</h2>
+                                <p class="subtext">Source directory: <code>~/AI-Workforce/incoming/</code></p>
+                            </div>
+                            <button class="btn btn-primary" onclick="window.scanIncomingAssets()">🔍 Scan Incoming</button>
+                        </div>
+                        <div class="asset-list" id="incomingAssetsContainer">
+                            <div class="empty-state">No incoming assets currently waiting. Click "Scan Incoming" to check.</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Installed Assets & Operational Knowledge -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Operational Knowledge & Active Registry</h2>
+                        </div>
+                        <div class="knowledge-viewer" id="knowledgeViewerContainer">
+                            <div class="tabs-sub">
+                                <button class="btn-sub active" onclick="window.showKnowledgeDoc('INSTALLED_ASSETS.md')">Installed Assets</button>
+                                <button class="btn-sub" onclick="window.showKnowledgeDoc('AVAILABLE_CAPABILITIES.md')">Capabilities</button>
+                                <button class="btn-sub" onclick="window.showKnowledgeDoc('SKILLS_INDEX.md')">Skills Index</button>
+                                <button class="btn-sub" onclick="window.showKnowledgeDoc('AGENT_TOOL_ACCESS.json')">Agent Tool Access</button>
+                            </div>
+                            <div class="doc-content" id="docContentArea">
+                                <pre>Loading operational knowledge...</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 5: Requirements Engine -->
+            <section id="requirementsTab" class="tab-pane">
+                <div class="split-view">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Submit System Requirement</h2>
+                        </div>
+                        <form id="requirementForm" onsubmit="window.submitRequirement(event)">
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select id="reqCategory" class="input-field">
+                                    <option value="agent">New Agent / Department</option>
+                                    <option value="specialist">New Specialist Subagent</option>
+                                    <option value="model">Model Provider Endpoint</option>
+                                    <option value="permission">Permission & Approval Policy</option>
+                                    <option value="workflow">Workflow Definition</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Requirement Title</label>
+                                <input type="text" id="reqTitle" class="input-field" placeholder="e.g. Data Science & Analytics Agent" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Specification (JSON)</label>
+                                <textarea id="reqSpec" class="input-field code-textarea" rows="8">{\n  "name": "Data Analyst Agent",\n  "department": "Analytics & Intelligence",\n  "role": "Quantitative Analyst",\n  "capabilities": ["sql_querying", "data_visualization"]\n}</textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Evaluate & Propose Change Plan</button>
+                        </form>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Requirements & Change History</h2>
+                        </div>
+                        <div class="requirements-list" id="requirementsListContainer">
+                            <div class="empty-state">No requirements evaluated yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 6: Event Stream -->
+            <section id="eventsTab" class="tab-pane">
+                <div class="panel full-panel">
+                    <div class="panel-header">
+                        <h2>System Execution Audit Log</h2>
+                        <span class="subtext">Real-time immutable audit trail from <code>execution_events</code></span>
+                    </div>
+                    <div class="event-stream" id="globalEventStreamContainer">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Create Task Modal -->
+    <div id="newTaskModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create Autonomous Task</h3>
+                <button class="close-btn" onclick="window.closeNewTaskModal()">✕</button>
+            </div>
+            <form onsubmit="window.handleCreateTask(event)">
+                <div class="form-group">
+                    <label>Task Title</label>
+                    <input type="text" id="taskTitleInput" class="input-field" placeholder="e.g. Conduct SEO audit and software architecture review" required>
+                </div>
+                <div class="form-group">
+                    <label>Description & Objectives</label>
+                    <textarea id="taskDescInput" class="input-field" rows="4" placeholder="Describe the business requirements, expectations, and deliverables..." required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="taskPriorityInput" class="input-field">
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Agent</label>
+                        <select id="taskAgentInput" class="input-field">
+                            <option value="coordinator">Coordinator Agent (Autonomous Planning)</option>
+                            <option value="market-seo-geo-researcher">Market, SEO & GEO Researcher</option>
+                            <option value="software-engineer">Software Engineer Agent</option>
+                            <option value="browser-use-agent">Browser Use Agent (Playwright)</option>
+                            <option value="system-integrator-update-agent">System Integrator & Update Agent</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="window.closeNewTaskModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Account Modal -->
+    <div id="newAccountModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Register Account in Secure Vault</h3>
+                <button class="close-btn" onclick="window.closeNewAccountModal()">✕</button>
+            </div>
+            <form onsubmit="window.handleCreateAccount(event)">
+                <div class="form-group">
+                    <label>Service / Application Name</label>
+                    <input type="text" id="accNameInput" class="input-field" placeholder="e.g. Semrush, GitHub, OpenAI, Cloudflare" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="accCategoryInput" class="input-field">
+                            <option value="research_seo">Research & SEO</option>
+                            <option value="ai_tools">AI Tools & Platforms</option>
+                            <option value="development">Development Platforms</option>
+                            <option value="marketing">Marketing Platforms</option>
+                            <option value="social_media">Social Media</option>
+                            <option value="hosting_domains">Hosting & Domains</option>
+                            <option value="cloud_infra">Cloud Infrastructure</option>
+                            <option value="analytics">Analytics</option>
+                            <option value="communication">Communication</option>
+                            <option value="business_apps">Business Applications</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>MFA Status</label>
+                        <select id="accMfaInput" class="input-field">
+                            <option value="DISABLED">Disabled</option>
+                            <option value="TOTP">Authenticator App (TOTP)</option>
+                            <option value="SMS">SMS Verification</option>
+                            <option value="EMAIL">Email Verification</option>
+                            <option value="SECURITY_KEY">Hardware Security Key</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Website URL</label>
+                        <input type="url" id="accUrlInput" class="input-field" placeholder="https://example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Login URL</label>
+                        <input type="url" id="accLoginUrlInput" class="input-field" placeholder="https://example.com/login" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username / Email</label>
+                        <input type="text" id="accUserInput" class="input-field" placeholder="user@company.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password (Encrypted in Vault)</label>
+                        <input type="password" id="accPassInput" class="input-field" placeholder="••••••••••••" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Authorized Agents (Hold 'authenticate' & 'use' permissions)</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:12px;">
+                        <label><input type="checkbox" name="authAgentCheck" value="market-seo-geo-researcher"> Market & SEO Researcher</label>
+                        <label><input type="checkbox" name="authAgentCheck" value="browser-use-agent" checked> Browser Use Agent</label>
+                        <label><input type="checkbox" name="authAgentCheck" value="software-engineer"> Software Engineer</label>
+                        <label><input type="checkbox" name="authAgentCheck" value="coordinator"> Coordinator Agent</label>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="window.closeNewAccountModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save to Encrypted Vault</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Account Detail Modal -->
+    <div id="accountDetailModal" class="modal-overlay">
+        <div class="modal" style="width:620px;">
+            <div class="modal-header">
+                <h3 id="detailAccName">Account Details</h3>
+                <button class="close-btn" onclick="window.closeAccountDetailModal()">✕</button>
+            </div>
+            <div id="accountDetailBody">
+                <!-- Dynamically loaded -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
