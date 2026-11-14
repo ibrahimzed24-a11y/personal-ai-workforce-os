@@ -1,1 +1,13 @@
-{}
+{
+  "coordinator": [
+    {
+      "asset_id": "asset_1488c6e9",
+      "name": "audit_sample_skill",
+      "category": "skill",
+      "path": "config/skills/audit_sample_skill/SKILL.md",
+      "capabilities": [
+        "skill:audit_sample_skill"
+      ]
+    }
+  ]
+}
