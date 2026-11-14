@@ -135,7 +135,7 @@ async def invoke_slash_command(req: SlashInvokeRequest):
         "command": req.command,
         "resolved": resolved,
         "startup_checklist": ctx["startup_checklist"],
-        "context_summary": f"Loaded CLAUDE.md, MEMORY.md, and {resolved['slash_command']} for {resolved['agent_id']}"
+        "context_summary": f"Loaded AGENT.md, MEMORY.md, and {resolved['slash_command']} for {resolved['agent_id']}"
     }
 
 # --- Post-Implementation Verification & Evidence Audit API ---
