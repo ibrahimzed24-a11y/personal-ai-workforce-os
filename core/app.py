@@ -75,6 +75,152 @@ async def get_task_events(task_id: str):
 async def list_agents():
     return await orchestrator.get_all_blueprints()
 
+# --- Standardized Three-File Architecture API ---
+class MemoryFeedbackRequest(BaseModel):
+    feedback: str
+    author: str = "owner"
+    auto_apply: bool = True
+
+class SlashInvokeRequest(BaseModel):
+    command: str
+    task_id: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+
+@app.get("/api/agents/three-file-catalog")
+async def get_three_file_catalog():
+    from core.agent_context import AgentContextLoader
+    loader = AgentContextLoader()
+    return loader.list_all_agents()
+
+@app.get("/api/agents/{agent_id}/context")
+async def get_agent_runtime_context(agent_id: str):
+    from core.agent_context import AgentContextLoader
+    loader = AgentContextLoader()
+    try:
+        return loader.build_runtime_context(agent_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@app.post("/api/agents/{agent_id}/memory/feedback")
+async def submit_memory_feedback(agent_id: str, req: MemoryFeedbackRequest):
+    from core.agent_context import AgentContextLoader
+    loader = AgentContextLoader()
+    try:
+        res = await loader.propose_memory_update(
+            agent_id=agent_id,
+            feedback=req.feedback,
+            author=req.author,
+            auto_apply=req.auto_apply
+        )
+        if res.get("status") == "rejected":
+            raise HTTPException(status_code=400, detail=res.get("reason"))
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/skills/invoke-slash")
+async def invoke_slash_command(req: SlashInvokeRequest):
+    from core.agent_context import AgentContextLoader
+    loader = AgentContextLoader()
+    resolved = loader.resolve_slash_command(req.command)
+    if not resolved:
+        raise HTTPException(status_code=404, detail=f"Slash command '{req.command}' not found")
+    
+    # Load agent context
+    ctx = loader.build_runtime_context(resolved["agent_id"], req.parameters or {})
+    return {
+        "status": "success",
+        "command": req.command,
+        "resolved": resolved,
+        "startup_checklist": ctx["startup_checklist"],
+        "context_summary": f"Loaded CLAUDE.md, MEMORY.md, and {resolved['slash_command']} for {resolved['agent_id']}"
+    }
+
+# --- Post-Implementation Verification & Evidence Audit API ---
+class VerificationAuditRequest(BaseModel):
+    target_component: str
+    profile: str = "standard"
+    requirements: Optional[List[Dict[str, Any]]] = None
+    task_id: Optional[str] = None
+    initiated_by: str = "user"
+    test_commands: Optional[List[str]] = None
+
+@app.post("/api/verification/audit")
+async def run_verification_audit(req: VerificationAuditRequest):
+    from core.verification.engine import PostImplementationVerificationEngine
+    from core.verification.models import VerificationProfile
+    engine = PostImplementationVerificationEngine()
+    try:
+        profile_enum = VerificationProfile(req.profile.lower())
+    except Exception:
+        profile_enum = VerificationProfile.STANDARD
+        
+    try:
+        return await engine.run_audit(
+            target_component=req.target_component,
+            profile=profile_enum,
+            requirements=req.requirements,
+            task_id=req.task_id,
+            initiated_by=req.initiated_by,
+            test_commands=req.test_commands
+        )
+    except Exception as e:
+        logger.error(f"Error executing verification audit: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/verification/audits")
+async def list_verification_audits(
+    limit: int = 50,
+    status: Optional[str] = None,
+    profile: Optional[str] = None,
+    target: Optional[str] = None
+):
+    from core.verification.engine import PostImplementationVerificationEngine
+    engine = PostImplementationVerificationEngine()
+    return await engine.list_audits(limit=limit, status=status, profile=profile, target_component=target)
+
+@app.get("/api/verification/audits/{audit_id}")
+async def get_verification_audit_detail(audit_id: str):
+    from core.verification.engine import PostImplementationVerificationEngine
+    engine = PostImplementationVerificationEngine()
+    audit = await engine.get_audit(audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit record not found")
+    return audit
+
+@app.get("/api/verification/profiles")
+async def get_verification_profiles():
+    return {
+        "profiles": [
+            {
+                "id": "lightweight",
+                "name": "Lightweight Profile",
+                "description": "For documentation, minor configs, and isolated updates.",
+                "checks": ["AST parsing", "Path validation", "Basic secret leak scan"]
+            },
+            {
+                "id": "standard",
+                "name": "Standard Profile",
+                "description": "For new skills, tools, agent changes, workflows, and features.",
+                "checks": ["Lightweight checks", "Mock/placeholder detection", "Automated test execution", "Basic permission probing"]
+            },
+            {
+                "id": "comprehensive",
+                "name": "Comprehensive Profile",
+                "description": "For core architecture changes, database migrations, runtimes, and releases.",
+                "checks": ["Standard checks", "Full test suite exit codes", "SQLite WAL persistence", "State recovery", "Negative security probing"]
+            },
+            {
+                "id": "security_audit",
+                "name": "Security Audit Profile",
+                "description": "For vault changes, auth/authz, permissions, and network exposure.",
+                "checks": ["Comprehensive checks", "Vault key 0600 POSIX mode", "Negative agent authorization rejection", "Token lifecycle assertion"]
+            }
+        ]
+    }
+
 # --- Requirements & Change Management API ---
 class RequirementCreate(BaseModel):
     category: str

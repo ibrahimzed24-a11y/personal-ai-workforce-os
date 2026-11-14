@@ -238,6 +238,8 @@ class SystemIntegratorEngine:
         clean_name = name.lower()
         if category == "skill":
             capabilities.append(f"skill:{clean_name}")
+            if any(k in clean_name for k in ["verif", "audit", "quality", "integrity"]):
+                target_agents.extend(["coordinator", "master-reporting-agent", "system-integrator-update-agent", "deployment-agent", "software-engineer"])
             if any(k in clean_name for k in ["seo", "market", "geo", "research"]):
                 target_agents.append("market-seo-geo-researcher")
             if any(k in clean_name for k in ["code", "developer", "engineer", "test", "refactor"]):
@@ -501,6 +503,18 @@ class SystemIntegratorEngine:
             cap_md.append(f"- **Path:** `{a['installation_plan'].get('target_path')}`")
             cap_md.append(f"- **Authorized Agents:** {', '.join([f'`{ag}`' for ag in a['target_agents']])}")
             cap_md.append(f"- **Capabilities Added:** {', '.join([f'`{c}`' for c in a['capabilities_added']])}\n")
+            
+        # Include standardized 32 agent skills
+        from core.agent_context import AgentContextLoader
+        loader = AgentContextLoader()
+        agent_list = loader.list_all_agents()
+        cap_md.append("## Standardized Agent Skills & Slash Commands\n")
+        for ag_info in agent_list:
+            if ag_info.get("has_skill_md"):
+                s_det = ag_info["skill_details"]
+                cap_md.append(f"- **`{s_det['slash_command']}`** (`{ag_info['agent_id']}`): {s_det['description']} (Path: `{s_det['path']}`)")
+        cap_md.append("\n")
+
         with open(KNOWLEDGE_DIR / "AVAILABLE_CAPABILITIES.md", "w", encoding="utf-8") as f:
             f.write("\n".join(cap_md) + "\n")
 
@@ -509,6 +523,13 @@ class SystemIntegratorEngine:
         skills_md = ["# Operational Knowledge: Skills Index\n", "Index of verified, active agent skills in the OS:\n"]
         for s in skills:
             skills_md.append(f"- **{s['name']}** (Version {s.get('version', '1.0.0')}): Registered at `{s['installation_plan'].get('target_path')}`, authorized for {', '.join(s['target_agents'])}.")
+        
+        skills_md.append("\n### Core & Specialist Agent Dedicated Skills:\n")
+        for ag_info in agent_list:
+            if ag_info.get("has_skill_md"):
+                s_det = ag_info["skill_details"]
+                skills_md.append(f"- **`{s_det['slash_command']}`** ({ag_info['agent_id']}): `{s_det['path']}` - {s_det['description']}")
+                
         with open(KNOWLEDGE_DIR / "SKILLS_INDEX.md", "w", encoding="utf-8") as f:
             f.write("\n".join(skills_md) + "\n")
 

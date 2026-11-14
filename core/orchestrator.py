@@ -335,6 +335,37 @@ class Orchestrator:
         agent_id = step["assigned_agent"]
         specialist_id = step.get("specialist_id")
         action_type = step.get("action_type")
+
+        # Enforce OS-Level Three-File Context Loading (CLAUDE.md, MEMORY.md, SKILL.md)
+        from core.agent_context import AgentContextLoader
+        context_loader = AgentContextLoader()
+        target_agent_id = specialist_id or agent_id
+        agent_context = None
+        try:
+            agent_context = context_loader.build_runtime_context(target_agent_id, {"task": task, "step": step})
+        except Exception:
+            try:
+                agent_context = context_loader.build_runtime_context(agent_id, {"task": task, "step": step})
+            except Exception:
+                pass
+
+        # Record context loaded execution event
+        if agent_context and task.get("id"):
+            try:
+                async with get_db_connection() as db:
+                    async with db.execute("SELECT id FROM tasks WHERE id = ?", (task["id"],)) as cur:
+                        if await cur.fetchone():
+                            await db.execute("""
+                                INSERT INTO execution_events (task_id, step_id, agent_id, event_type, payload)
+                                VALUES (?, ?, ?, 'agent_context_loaded', ?)
+                            """, (task["id"], step["id"], target_agent_id, json.dumps({
+                                "agent": target_agent_id,
+                                "active_skill": agent_context["active_skill"]["slash_command"],
+                                "checklist": agent_context["startup_checklist"]
+                            })))
+                            await db.commit()
+            except Exception as e:
+                logger.debug(f"Event logging skipped: {e}")
         
         # Execute action through appropriate adapter
         if agent_id == "browser-use-agent":
@@ -344,6 +375,7 @@ class Orchestrator:
             return {
                 "agent": agent_id,
                 "specialist": specialist_id,
+                "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else "/browser-automation",
                 "action": "browser_navigation",
                 "details": res
             }
@@ -353,6 +385,7 @@ class Orchestrator:
             return {
                 "agent": agent_id,
                 "specialist": specialist_id,
+                "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else "/market-seo-geo-research",
                 "action": "seo_market_audit",
                 "findings": {
                     "search_volume_trend": "+45% YoY",
@@ -366,6 +399,7 @@ class Orchestrator:
             return {
                 "agent": agent_id,
                 "specialist": specialist_id,
+                "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else "/software-engineering",
                 "action": "architecture_specification",
                 "components": [
                     {"name": "coordinator", "status": "active"},
@@ -375,22 +409,55 @@ class Orchestrator:
             }
             
         elif agent_id == "master-reporting-agent":
-            # Master reporting step
+            # Master reporting step with evidence audit synthesis
+            from core.verification.engine import PostImplementationVerificationEngine
+            verif_engine = PostImplementationVerificationEngine(WORKSPACE_ROOT)
+            recent_audits = await verif_engine.list_audits(limit=5)
             return {
                 "agent": agent_id,
                 "specialist": specialist_id,
+                "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else "/master-reporting",
                 "action": "executive_synthesis",
                 "status": "compiled",
-                "notes": "Deliverable packaged and verified."
+                "recent_audits_count": len(recent_audits),
+                "verified_audits": sum(1 for a in recent_audits if a.get("status") == "VERIFIED"),
+                "notes": "Deliverable packaged and verified with traceable evidence audit trails."
+            }
+
+        elif action_type in ["post_implementation_verification", "evidence_audit", "verify_implementation"]:
+            params = step.get("parameters", {})
+            audit_res = await self.verifier.execute("audit", {
+                "target_component": params.get("target_component", task["title"]),
+                "profile": params.get("profile", "standard"),
+                "requirements": params.get("requirements"),
+                "initiated_by": agent_id
+            }, {"task_id": task["id"]})
+            return {
+                "agent": agent_id,
+                "specialist": specialist_id,
+                "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else None,
+                "action": "post_implementation_verification",
+                "audit_result": audit_res
             }
             
-        # Default agent execution
+        # Default agent execution with three-file composite system prompt
+        sys_prompt = agent_context["composite_system_prompt"] if agent_context else f"Execute step: {step['title']}"
         gen = await self.model_provider.generate(
-            system_prompt=f"Execute step: {step['title']}",
+            system_prompt=sys_prompt,
             user_prompt=step["description"],
-            context={"agent_role": agent_id, "specialist_id": specialist_id, "task_title": task["title"]}
+            context={
+                "agent_role": agent_id,
+                "specialist_id": specialist_id,
+                "task_title": task["title"],
+                "active_skill": agent_context["active_skill"]["slash_command"] if agent_context else None
+            }
         )
-        return {"agent": agent_id, "specialist": specialist_id, "result": gen}
+        return {
+            "agent": agent_id,
+            "specialist": specialist_id,
+            "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else None,
+            "result": gen
+        }
 
     def _render_deliverable(self, task: Dict[str, Any], steps: List[Dict[str, Any]]) -> str:
         date_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")

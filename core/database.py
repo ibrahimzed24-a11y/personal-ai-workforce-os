@@ -251,6 +251,28 @@ CREATE TABLE IF NOT EXISTS credential_audit_logs (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Post-Implementation Verification & Evidence Audit System
+CREATE TABLE IF NOT EXISTS verification_audits (
+    id TEXT PRIMARY KEY,
+    task_id TEXT,
+    target_component TEXT NOT NULL,
+    target_version TEXT,
+    profile TEXT NOT NULL, -- lightweight, standard, comprehensive, security_audit
+    status TEXT NOT NULL,  -- VERIFIED, IMPLEMENTED_NOT_VERIFIED, PARTIALLY_IMPLEMENTED, MOCKED_OR_SIMULATED, NOT_IMPLEMENTED, BROKEN, BLOCKED
+    initiated_by TEXT NOT NULL, -- coordinator, verifier, system_integrator, deployment_agent, user
+    requirements_evaluated TEXT NOT NULL, -- JSON array
+    inspections TEXT NOT NULL,            -- JSON array
+    tests_executed TEXT NOT NULL,         -- JSON array
+    security_findings TEXT NOT NULL,      -- JSON array
+    reliability_findings TEXT NOT NULL,   -- JSON array
+    evidence_summary TEXT NOT NULL,
+    evidence_artifact_path TEXT,
+    remediation_plan TEXT,                -- JSON object or text
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE SET NULL
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_events_task_id ON execution_events(task_id);
@@ -260,6 +282,9 @@ CREATE INDEX IF NOT EXISTS idx_credential_accounts_cat ON credential_accounts(ca
 CREATE INDEX IF NOT EXISTS idx_credential_access_agent ON credential_access_policies(agent_id);
 CREATE INDEX IF NOT EXISTS idx_credential_audit_acc ON credential_audit_logs(account_id);
 CREATE INDEX IF NOT EXISTS idx_credential_audit_actor ON credential_audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_verification_audits_status ON verification_audits(status);
+CREATE INDEX IF NOT EXISTS idx_verification_audits_target ON verification_audits(target_component);
+CREATE INDEX IF NOT EXISTS idx_verification_audits_profile ON verification_audits(profile);
 """
 
 from contextlib import asynccontextmanager

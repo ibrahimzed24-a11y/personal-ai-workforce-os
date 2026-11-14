@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PostImplementationVerificationEvidenceSchema",
+  "description": "Evidence schema for Post-Implementation Verification & Evidence Audit runs in AI Workforce OS",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "pattern": "^audit_[a-f0-9]+$" },
+    "task_id": { "type": ["string", "null"] },
+    "target_component": { "type": "string" },
+    "target_version": { "type": ["string", "null"] },
+    "profile": {
+      "type": "string",
+      "enum": ["lightweight", "standard", "comprehensive", "security_audit"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "VERIFIED",
+        "IMPLEMENTED_NOT_VERIFIED",
+        "PARTIALLY_IMPLEMENTED",
+        "MOCKED_OR_SIMULATED",
+        "NOT_IMPLEMENTED",
+        "BROKEN",
+        "BLOCKED"
+      ]
+    },
+    "initiated_by": { "type": "string" },
+    "requirements_evaluated": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "requirement_id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string" },
+          "evidence_ref": { "type": "string" }
+        },
+        "required": ["requirement_id", "title", "status"]
+      }
+    },
+    "tests_executed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "status": { "type": "string" },
+          "duration_sec": { "type": "number" },
+          "stdout_preview": { "type": "string" },
+          "stderr_preview": { "type": "string" },
+          "tests_passed": { "type": "integer" },
+          "tests_failed": { "type": "integer" },
+          "tests_skipped": { "type": "integer" }
+        },
+        "required": ["command", "exit_code", "status"]
+      }
+    },
+    "security_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"]
+          },
+          "category": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "file_path": { "type": ["string", "null"] },
+          "line_number": { "type": ["integer", "null"] },
+          "remediation": { "type": ["string", "null"] }
+        },
+        "required": ["severity", "category", "title", "description"]
+      }
+    },
+    "evidence_summary": { "type": "string" },
+    "evidence_artifact_path": { "type": ["string", "null"] },
+    "remediation_plan": { "type": ["object", "null"] },
+    "created_at": { "type": "string" },
+    "completed_at": { "type": ["string", "null"] }
+  },
+  "required": [
+    "id",
+    "target_component",
+    "profile",
+    "status",
+    "initiated_by",
+    "requirements_evaluated",
+    "tests_executed",
+    "security_findings",
+    "evidence_summary",
+    "created_at"
+  ]
+}

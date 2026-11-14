@@ -123,8 +123,46 @@ class PlaywrightAdapter(RuntimeAdapter):
             }
 
 class VerificationAdapter(RuntimeAdapter):
-    """Independent verification engine checking output deliverables."""
+    """Independent verification engine checking output deliverables and full evidence audits."""
+    def __init__(self):
+        self._engine = None
+
+    def _get_engine(self):
+        if self._engine is None:
+            from core.verification.engine import PostImplementationVerificationEngine
+            self._engine = PostImplementationVerificationEngine(WORKSPACE_ROOT)
+        return self._engine
+
     async def execute(self, action: str, parameters: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        task_id = context.get("task_id") if context else None
+
+        if action in ["audit", "verify_implementation"]:
+            engine = self._get_engine()
+            target = parameters.get("target_component", "core")
+            profile_str = parameters.get("profile", "standard")
+            from core.verification.models import VerificationProfile
+            try:
+                profile = VerificationProfile(profile_str)
+            except Exception:
+                profile = VerificationProfile.STANDARD
+            
+            audit_res = await engine.run_audit(
+                target_component=target,
+                profile=profile,
+                requirements=parameters.get("requirements"),
+                task_id=task_id,
+                initiated_by=parameters.get("initiated_by", "system_verifier")
+            )
+            return {
+                "status": "passed" if audit_res["status"] == "VERIFIED" else "failed",
+                "audit_id": audit_res["id"],
+                "verification_status": audit_res["status"],
+                "evidence_summary": audit_res["evidence_summary"],
+                "evidence_artifact_path": audit_res["evidence_artifact_path"],
+                "remediation_plan": audit_res["remediation_plan"]
+            }
+
+        # Standard deliverable check
         task_output = parameters.get("output", {})
         checks = []
         all_passed = True
