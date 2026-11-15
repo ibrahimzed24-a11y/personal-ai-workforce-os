@@ -60,7 +60,10 @@
       <!-- Top Project Header & Navigation Tabs -->
       <header class="project-header">
         <div>
-          <h2 id="active-project-name">Select or create a project</h2>
+          <div class="project-title-row">
+            <h2 id="active-project-name">Select or create a project</h2>
+            <span id="active-project-model-badge" class="model-badge clickable" title="Click to view/edit model in Project Settings">AntiGravity Sovereign</span>
+          </div>
           <p id="active-project-goal" class="project-goal">Each project has its own isolated AI agents, core data files, saved logins, and reports.</p>
         </div>
         <div class="tab-bar">
@@ -209,7 +212,7 @@
         <div class="panel-scroll">
           <div class="card">
             <h3>Project Configuration & Team</h3>
-            <p class="subtext">Customize the project name, main objective, execution engine, and which agents work on this project.</p>
+            <p class="subtext">Customize the project name, main objective, execution environment, and LLM configuration.</p>
             <form id="settings-form" class="grid-form">
               <div>
                 <label>Project Name</label>
@@ -218,11 +221,106 @@
               <div>
                 <label>Execution Environment</label>
                 <select id="set-runtime">
-                  <option value="antigravity">AntiGravity Workspace (Default)</option>
-                  <option value="local_llm">Local LLM (MacBook Ollama: 127.0.0.1:8765)</option>
-                  <option value="cloud_api">Cloud API (Gemini / OpenAI)</option>
+                  <option value="antigravity">AntiGravity Sovereign Engine (Default)</option>
+                  <option value="cloud_api">Cloud LLM API (Gemini, Claude, OpenAI, Groq, DeepSeek, OpenRouter)</option>
+                  <option value="local_llm">Local Sovereign LLM (MacBook Ollama: 127.0.0.1:11434 / 8765)</option>
                 </select>
               </div>
+
+              <!-- Dynamic Sub-Panel: Cloud LLM Config -->
+              <div id="set-cloud-panel" class="full-span config-panel hidden">
+                <div class="config-panel-header">
+                  <div class="config-title">
+                    <span class="dot emerald"></span>
+                    <strong>Cloud Model & API Key Configuration</strong>
+                  </div>
+                  <span class="badge-subtle">Encrypted via POSIX 0600 Fernet Vault</span>
+                </div>
+
+                <div class="grid-2col">
+                  <div>
+                    <label>Provider</label>
+                    <select id="set-llm-provider">
+                      <option value="gemini">Google Gemini (Recommended)</option>
+                      <option value="anthropic">Anthropic Claude</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="groq">Groq (Ultra-Fast LPU)</option>
+                      <option value="deepseek">DeepSeek (V3 / R1)</option>
+                      <option value="openrouter">OpenRouter (Universal Router)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Model</label>
+                    <div class="model-select-wrap">
+                      <select id="set-llm-model-select">
+                        <!-- Populated dynamically based on provider -->
+                      </select>
+                      <input type="text" id="set-llm-model-custom" class="hidden" placeholder="e.g. gemini-2.5-pro or gpt-4o" />
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top:0.75rem;">
+                  <div class="row-between">
+                    <label>Provider API Key <span id="set-key-status" class="key-status-hint"></span></label>
+                    <button type="button" id="set-toggle-key-visibility" class="btn-link-action">Show</button>
+                  </div>
+                  <div class="input-with-button">
+                    <input type="password" id="set-llm-key" placeholder="Enter API Key (Leave blank to keep existing encrypted key)" autocomplete="off" />
+                    <button type="button" id="set-test-llm-btn" class="btn-secondary">Test Connection</button>
+                  </div>
+                  <div id="set-llm-feedback" class="status-feedback hidden"></div>
+                </div>
+              </div>
+
+              <!-- Dynamic Sub-Panel: Local Ollama Config -->
+              <div id="set-local-panel" class="full-span config-panel hidden">
+                <div class="config-panel-header">
+                  <div class="config-title">
+                    <span class="dot blue"></span>
+                    <strong>Local Ollama Node Configuration</strong>
+                  </div>
+                  <span class="badge-subtle">Zero Cloud Leaks & Sovereign Local Inference</span>
+                </div>
+                <div class="grid-2col">
+                  <div>
+                    <label>Ollama Endpoint</label>
+                    <input type="text" id="set-local-endpoint" placeholder="http://127.0.0.1:11434" value="http://127.0.0.1:11434" />
+                  </div>
+                  <div>
+                    <label>Local Model</label>
+                    <div class="model-select-wrap">
+                      <select id="set-local-model-select">
+                        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (Recommended)</option>
+                        <option value="llama3.1:8b">llama3.1:8b</option>
+                        <option value="deepseek-r1:8b">deepseek-r1:8b</option>
+                        <option value="mistral:7b">mistral:7b</option>
+                        <option value="__custom__">Custom local model...</option>
+                      </select>
+                      <input type="text" id="set-local-model-custom" class="hidden" placeholder="Enter local model tag" />
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top:0.75rem;" class="row-between">
+                  <button type="button" id="set-test-local-btn" class="btn-secondary">Probe Local Ollama Models</button>
+                  <div id="set-local-feedback" class="status-feedback hidden"></div>
+                </div>
+              </div>
+
+              <!-- Dynamic Sub-Panel: AntiGravity Default -->
+              <div id="set-antigravity-panel" class="full-span config-panel">
+                <div class="config-panel-header">
+                  <div class="config-title">
+                    <span class="dot emerald"></span>
+                    <strong>AntiGravity Sovereign Workspace</strong>
+                  </div>
+                  <span class="badge-subtle">Autonomous Coordinator</span>
+                </div>
+                <p class="subtext" style="margin-top:0.25rem; margin-bottom:0;">
+                  Executes using AntiGravity's autonomous 5-stage coordination loop. Grounded in your project's core documents with zero external API key requirements.
+                </p>
+              </div>
+
               <div class="full-span">
                 <label>Project Goal</label>
                 <input type="text" id="set-goal" placeholder="What should this project achieve?" />
@@ -244,21 +342,73 @@
 
   <!-- Create Project Modal -->
   <div id="project-modal" class="modal-backdrop hidden">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width:540px;">
       <h3>Create Isolated Project</h3>
-      <p class="subtext">Start a clean workspace with its own agents, core data files, saved logins, and chat history.</p>
+      <p class="subtext">Start a clean workspace with its own agents, core data files, saved logins, and execution model.</p>
       <form id="create-project-form">
         <label>Project Name</label>
         <input type="text" id="new-proj-name" required placeholder="e.g. Valioz Health Sales & Outreach" />
         <label>Main Goal</label>
         <input type="text" id="new-proj-goal" placeholder="e.g. Draft email campaigns, schedule and send emails to leads" />
+
         <label>Execution Engine</label>
         <select id="new-proj-runtime">
-          <option value="antigravity">AntiGravity (Default)</option>
-          <option value="local_llm">Local LLM (Ollama: 127.0.0.1:8765)</option>
-          <option value="cloud_api">Cloud API</option>
+          <option value="antigravity">AntiGravity Sovereign (Default)</option>
+          <option value="cloud_api">Cloud LLM API (Gemini, Claude, OpenAI, Groq, DeepSeek, OpenRouter)</option>
+          <option value="local_llm">Local Sovereign LLM (MacBook Ollama: 127.0.0.1:11434 / 8765)</option>
         </select>
-        <div class="modal-actions">
+
+        <!-- New Project Cloud Configuration -->
+        <div id="new-proj-cloud-panel" class="config-panel hidden">
+          <div class="grid-2col">
+            <div>
+              <label>Provider</label>
+              <select id="new-proj-provider">
+                <option value="gemini">Google Gemini (Recommended)</option>
+                <option value="anthropic">Anthropic Claude</option>
+                <option value="openai">OpenAI</option>
+                <option value="groq">Groq (Ultra-Fast LPU)</option>
+                <option value="deepseek">DeepSeek (V3 / R1)</option>
+                <option value="openrouter">OpenRouter (Universal Router)</option>
+              </select>
+            </div>
+            <div>
+              <label>Model</label>
+              <div class="model-select-wrap">
+                <select id="new-proj-model-select">
+                  <!-- Populated dynamically -->
+                </select>
+                <input type="text" id="new-proj-model-custom" class="hidden" placeholder="Custom model tag" />
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:0.65rem;">
+            <div class="row-between">
+              <label>Provider API Key (Optional if configured in environment)</label>
+            </div>
+            <div class="input-with-button">
+              <input type="password" id="new-proj-key" placeholder="Enter API Key or leave empty to use system default" autocomplete="off" />
+              <button type="button" id="new-proj-test-btn" class="btn-secondary small">Test</button>
+            </div>
+            <div id="new-proj-test-feedback" class="status-feedback hidden"></div>
+          </div>
+        </div>
+
+        <!-- New Project Local Configuration -->
+        <div id="new-proj-local-panel" class="config-panel hidden">
+          <div class="grid-2col">
+            <div>
+              <label>Ollama Endpoint</label>
+              <input type="text" id="new-proj-local-endpoint" value="http://127.0.0.1:11434" />
+            </div>
+            <div>
+              <label>Local Model</label>
+              <input type="text" id="new-proj-local-model" value="qwen2.5-coder:7b" placeholder="e.g. qwen2.5-coder:7b" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top:1.25rem;">
           <button type="button" id="close-modal-btn" class="btn-secondary">Cancel</button>
           <button type="submit" class="btn-primary">Create Project</button>
         </div>

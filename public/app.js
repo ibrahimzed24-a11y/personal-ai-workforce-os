@@ -12,6 +12,222 @@ let inspectingDoc = null;
 let workerOnline = false;
 let isSignUpMode = false;
 
+const LLM_PROVIDERS = {
+  gemini: {
+    name: 'Google Gemini',
+    default_model: 'gemini-2.5-flash',
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+    placeholder_key: 'AIzaSy...',
+  },
+  anthropic: {
+    name: 'Anthropic Claude',
+    default_model: 'claude-3-7-sonnet-20250219',
+    models: ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+    placeholder_key: 'sk-ant-...',
+  },
+  claude: {
+    name: 'Anthropic Claude',
+    default_model: 'claude-3-7-sonnet-20250219',
+    models: ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+    placeholder_key: 'sk-ant-...',
+  },
+  openai: {
+    name: 'OpenAI',
+    default_model: 'gpt-4o',
+    models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'gpt-4-turbo'],
+    placeholder_key: 'sk-proj-...',
+  },
+  groq: {
+    name: 'Groq (Ultra-Fast LPU)',
+    default_model: 'llama-3.3-70b-versatile',
+    models: ['llama-3.3-70b-versatile', 'deepseek-r1-distill-llama-70b', 'mixtral-8x7b-32768'],
+    placeholder_key: 'gsk_...',
+  },
+  deepseek: {
+    name: 'DeepSeek',
+    default_model: 'deepseek-chat',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+    placeholder_key: 'sk-...',
+  },
+  openrouter: {
+    name: 'OpenRouter (Universal Router)',
+    default_model: 'google/gemini-2.5-flash',
+    models: ['google/gemini-2.5-flash', 'anthropic/claude-3.7-sonnet', 'deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct'],
+    placeholder_key: 'sk-or-v1-...',
+  },
+};
+
+function populateProviderModelSelect(providerKey, selectEl, customInputEl, currentModel) {
+  if (!selectEl) return;
+  const p = LLM_PROVIDERS[providerKey] || LLM_PROVIDERS.gemini;
+  selectEl.innerHTML = '';
+  p.models.forEach((m) => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m + (m === p.default_model ? ' (Recommended)' : '');
+    selectEl.appendChild(opt);
+  });
+  const customOpt = document.createElement('option');
+  customOpt.value = '__custom__';
+  customOpt.textContent = 'Custom model tag...';
+  selectEl.appendChild(customOpt);
+
+  if (currentModel) {
+    if (p.models.includes(currentModel)) {
+      selectEl.value = currentModel;
+      if (customInputEl) {
+        customInputEl.classList.add('hidden');
+        customInputEl.value = '';
+      }
+    } else {
+      selectEl.value = '__custom__';
+      if (customInputEl) {
+        customInputEl.classList.remove('hidden');
+        customInputEl.value = currentModel;
+      }
+    }
+  } else {
+    selectEl.value = p.default_model;
+    if (customInputEl) {
+      customInputEl.classList.add('hidden');
+      customInputEl.value = '';
+    }
+  }
+}
+
+function updateRuntimeVisibility(runtime, prefix = 'set') {
+  const cloudPanel = document.getElementById(`${prefix}-cloud-panel`);
+  const localPanel = document.getElementById(`${prefix}-local-panel`);
+  const agPanel = document.getElementById(`${prefix}-antigravity-panel`);
+
+  if (cloudPanel) cloudPanel.classList.toggle('hidden', runtime !== 'cloud_api');
+  if (localPanel) localPanel.classList.toggle('hidden', runtime !== 'local_llm');
+  if (agPanel) agPanel.classList.toggle('hidden', runtime !== 'antigravity');
+}
+
+function updateActiveModelBadge(project) {
+  const badge = document.getElementById('active-project-model-badge');
+  if (!badge) return;
+  badge.className = 'model-badge clickable';
+
+  if (!project) {
+    badge.textContent = 'No Project';
+    badge.classList.add('model-badge-default');
+    return;
+  }
+
+  const mode = project.runtime_mode || 'antigravity';
+  if (mode === 'cloud_api') {
+    const provName = LLM_PROVIDERS[project.llm_provider]?.name || project.llm_provider || 'Cloud';
+    const model = project.llm_model || 'gemini-2.5-flash';
+    badge.textContent = `⚡ ${provName}: ${model}`;
+    badge.classList.add('model-badge-cloud');
+  } else if (mode === 'local_llm') {
+    const model = project.llm_model || 'qwen2.5-coder:7b';
+    badge.textContent = `💻 Local: ${model}`;
+    badge.classList.add('model-badge-local');
+  } else {
+    badge.textContent = '🛡️ AntiGravity Sovereign';
+    badge.classList.add('model-badge-default');
+  }
+}
+
+async function testLLMConnection(prefix = 'set') {
+  const feedbackEl = document.getElementById(`${prefix}-llm-feedback`) || document.getElementById(`${prefix}-test-feedback`);
+  const providerEl = document.getElementById(`${prefix}-llm-provider`) || document.getElementById(`${prefix}-provider`);
+  const modelSelectEl = document.getElementById(`${prefix}-llm-model-select`) || document.getElementById(`${prefix}-model-select`);
+  const customInputEl = document.getElementById(`${prefix}-llm-model-custom`) || document.getElementById(`${prefix}-model-custom`);
+  const keyEl = document.getElementById(`${prefix}-llm-key`) || document.getElementById(`${prefix}-key`);
+  const testBtn = document.getElementById(`${prefix}-test-llm-btn`) || document.getElementById(`${prefix}-test-btn`);
+
+  const provider = providerEl ? providerEl.value : 'gemini';
+  let model = modelSelectEl ? modelSelectEl.value : 'gemini-2.5-flash';
+  if (model === '__custom__' && customInputEl && customInputEl.value.trim()) {
+    model = customInputEl.value.trim();
+  }
+  const apiKey = keyEl ? keyEl.value.trim() : '';
+
+  if (feedbackEl) {
+    feedbackEl.className = 'status-feedback loading';
+    feedbackEl.innerHTML = `<span class="dot blue"></span> Testing ${escapeHtml(provider)} (${escapeHtml(model)})...`;
+    feedbackEl.classList.remove('hidden');
+  }
+  if (testBtn) testBtn.disabled = true;
+
+  try {
+    const data = await apiFetch('/api/models/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        provider: provider,
+        model: model,
+        api_key: apiKey || null,
+      }),
+    });
+
+    if (data.status === 'ok') {
+      feedbackEl.className = 'status-feedback success';
+      feedbackEl.innerHTML = `<span class="dot emerald"></span> Connected successfully to ${escapeHtml(data.model)} (${data.latency_ms}ms) — Validated & Ready`;
+    } else {
+      feedbackEl.className = 'status-feedback error';
+      feedbackEl.innerHTML = `<span class="dot rose"></span> Failed: ${escapeHtml(data.error || 'Connection rejected')}`;
+    }
+  } catch (err) {
+    if (feedbackEl) {
+      feedbackEl.className = 'status-feedback error';
+      feedbackEl.innerHTML = `<span class="dot rose"></span> Error: ${escapeHtml(err.message)}`;
+    }
+  } finally {
+    if (testBtn) testBtn.disabled = false;
+  }
+}
+
+async function probeLocalOllama(prefix = 'set') {
+  const feedbackEl = document.getElementById(`${prefix}-local-feedback`);
+  const selectEl = document.getElementById(`${prefix}-local-model-select`);
+  const btn = document.getElementById(`${prefix}-test-local-btn`);
+
+  if (feedbackEl) {
+    feedbackEl.className = 'status-feedback loading';
+    feedbackEl.innerHTML = '<span class="dot blue"></span> Probing local Ollama daemon...';
+    feedbackEl.classList.remove('hidden');
+  }
+  if (btn) btn.disabled = true;
+
+  try {
+    const data = await apiFetch('/api/models/local/tags');
+    if (data.status === 'ok' && data.models && data.models.length > 0) {
+      if (selectEl) {
+        selectEl.innerHTML = '';
+        data.models.forEach((m) => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          selectEl.appendChild(opt);
+        });
+        const customOpt = document.createElement('option');
+        customOpt.value = '__custom__';
+        customOpt.textContent = 'Custom local model...';
+        selectEl.appendChild(customOpt);
+      }
+      feedbackEl.className = 'status-feedback success';
+      feedbackEl.innerHTML = `<span class="dot emerald"></span> Detected ${data.models.length} local models: ${escapeHtml(data.models.join(', '))}`;
+    } else {
+      feedbackEl.className = 'status-feedback';
+      feedbackEl.style.background = '#FEF3C7';
+      feedbackEl.style.color = '#B45309';
+      feedbackEl.style.border = '1px solid #FDE68A';
+      feedbackEl.innerHTML = `<span class="dot amber"></span> Local daemon on standby. AntiGravity fallback ready with qwen2.5-coder:7b.`;
+    }
+  } catch (err) {
+    if (feedbackEl) {
+      feedbackEl.className = 'status-feedback error';
+      feedbackEl.innerHTML = `<span class="dot rose"></span> Probe failed: ${escapeHtml(err.message)}`;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function showToast(msg) {
   const bar = document.getElementById('toast-bar');
   if (!bar) return;
@@ -118,6 +334,48 @@ function renderProjects() {
     if (setGoal) setGoal.value = current.goal || '';
     if (setRuntime) setRuntime.value = current.runtime_mode || 'antigravity';
     if (setAgents) setAgents.value = (current.assigned_agents || []).join(', ');
+
+    const setProvider = document.getElementById('set-llm-provider');
+    const setModelSelect = document.getElementById('set-llm-model-select');
+    const setModelCustom = document.getElementById('set-llm-model-custom');
+    if (setProvider) {
+      setProvider.value = current.llm_provider || 'gemini';
+      populateProviderModelSelect(setProvider.value, setModelSelect, setModelCustom, current.llm_model);
+    }
+
+    const setKey = document.getElementById('set-llm-key');
+    const setKeyStatus = document.getElementById('set-key-status');
+    if (setKey) {
+      setKey.value = '';
+      setKey.placeholder = current.has_api_key ? '•••••••• (Encrypted in Vault - enter new key to overwrite)' : 'Enter API Key (Optional if configured in environment)';
+    }
+    if (setKeyStatus) {
+      setKeyStatus.textContent = current.has_api_key ? '(Configured & Encrypted)' : '(Not set - uses system default)';
+    }
+
+    const setLocalEndpoint = document.getElementById('set-local-endpoint');
+    if (setLocalEndpoint) setLocalEndpoint.value = current.llm_endpoint || 'http://127.0.0.1:11434';
+
+    const setLocalModelSelect = document.getElementById('set-local-model-select');
+    const setLocalModelCustom = document.getElementById('set-local-model-custom');
+    if (setLocalModelSelect && current.runtime_mode === 'local_llm' && current.llm_model) {
+      const opts = Array.from(setLocalModelSelect.options).map((o) => o.value);
+      if (opts.includes(current.llm_model)) {
+        setLocalModelSelect.value = current.llm_model;
+        if (setLocalModelCustom) setLocalModelCustom.classList.add('hidden');
+      } else {
+        setLocalModelSelect.value = '__custom__';
+        if (setLocalModelCustom) {
+          setLocalModelCustom.classList.remove('hidden');
+          setLocalModelCustom.value = current.llm_model;
+        }
+      }
+    }
+
+    updateRuntimeVisibility(current.runtime_mode || 'antigravity', 'set');
+    updateActiveModelBadge(current);
+  } else {
+    updateActiveModelBadge(null);
   }
 }
 
@@ -663,22 +921,75 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('new-project-btn').addEventListener('click', () => {
-  document.getElementById('project-modal').classList.remove('hidden');
+  const modal = document.getElementById('project-modal');
+  modal.classList.remove('hidden');
+  const providerEl = document.getElementById('new-proj-provider');
+  const selectEl = document.getElementById('new-proj-model-select');
+  const customEl = document.getElementById('new-proj-model-custom');
+  if (providerEl && selectEl) {
+    populateProviderModelSelect(providerEl.value, selectEl, customEl);
+  }
+  updateRuntimeVisibility(document.getElementById('new-proj-runtime')?.value || 'antigravity', 'new-proj');
 });
 
 document.getElementById('close-modal-btn').addEventListener('click', () => {
   document.getElementById('project-modal').classList.add('hidden');
 });
 
+// Create Project: Runtime & Provider Dynamic Switching
+document.getElementById('new-proj-runtime')?.addEventListener('change', (e) => {
+  updateRuntimeVisibility(e.target.value, 'new-proj');
+});
+
+document.getElementById('new-proj-provider')?.addEventListener('change', (e) => {
+  const selectEl = document.getElementById('new-proj-model-select');
+  const customEl = document.getElementById('new-proj-model-custom');
+  populateProviderModelSelect(e.target.value, selectEl, customEl);
+});
+
+document.getElementById('new-proj-model-select')?.addEventListener('change', (e) => {
+  const customEl = document.getElementById('new-proj-model-custom');
+  if (customEl) {
+    customEl.classList.toggle('hidden', e.target.value !== '__custom__');
+    if (e.target.value === '__custom__') customEl.focus();
+  }
+});
+
+document.getElementById('new-proj-test-btn')?.addEventListener('click', () => {
+  testLLMConnection('new-proj');
+});
+
 document.getElementById('create-project-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const runtime = document.getElementById('new-proj-runtime').value;
+  let provider = 'gemini';
+  let model = 'gemini-2.5-flash';
+  let apiKey = '';
+  let endpoint = '';
+
+  if (runtime === 'cloud_api') {
+    provider = document.getElementById('new-proj-provider').value;
+    const mSelect = document.getElementById('new-proj-model-select');
+    const mCustom = document.getElementById('new-proj-model-custom');
+    model = mSelect.value === '__custom__' ? (mCustom.value.trim() || 'gemini-2.5-flash') : mSelect.value;
+    apiKey = document.getElementById('new-proj-key').value.trim();
+  } else if (runtime === 'local_llm') {
+    provider = 'ollama';
+    endpoint = document.getElementById('new-proj-local-endpoint').value.trim();
+    model = document.getElementById('new-proj-local-model').value.trim() || 'qwen2.5-coder:7b';
+  }
+
   try {
     const data = await apiFetch('/api/projects', {
       method: 'POST',
       body: JSON.stringify({
         name: document.getElementById('new-proj-name').value.trim(),
         goal: document.getElementById('new-proj-goal').value.trim(),
-        runtime_mode: document.getElementById('new-proj-runtime').value,
+        runtime_mode: runtime,
+        llm_provider: provider,
+        llm_model: model,
+        llm_api_key: apiKey || null,
+        llm_endpoint: endpoint || null,
       }),
     });
     document.getElementById('project-modal').classList.add('hidden');
@@ -690,6 +1001,54 @@ document.getElementById('create-project-form').addEventListener('submit', async 
   }
 });
 
+// Project Settings: Dynamic LLM Environment, Provider, Key, & Local Daemon Controls
+document.getElementById('set-runtime')?.addEventListener('change', (e) => {
+  updateRuntimeVisibility(e.target.value, 'set');
+});
+
+document.getElementById('set-llm-provider')?.addEventListener('change', (e) => {
+  const selectEl = document.getElementById('set-llm-model-select');
+  const customEl = document.getElementById('set-llm-model-custom');
+  populateProviderModelSelect(e.target.value, selectEl, customEl);
+});
+
+document.getElementById('set-llm-model-select')?.addEventListener('change', (e) => {
+  const customEl = document.getElementById('set-llm-model-custom');
+  if (customEl) {
+    customEl.classList.toggle('hidden', e.target.value !== '__custom__');
+    if (e.target.value === '__custom__') customEl.focus();
+  }
+});
+
+document.getElementById('set-local-model-select')?.addEventListener('change', (e) => {
+  const customEl = document.getElementById('set-local-model-custom');
+  if (customEl) {
+    customEl.classList.toggle('hidden', e.target.value !== '__custom__');
+    if (e.target.value === '__custom__') customEl.focus();
+  }
+});
+
+document.getElementById('set-toggle-key-visibility')?.addEventListener('click', (e) => {
+  const keyInput = document.getElementById('set-llm-key');
+  if (!keyInput) return;
+  const isPass = keyInput.type === 'password';
+  keyInput.type = isPass ? 'text' : 'password';
+  e.target.textContent = isPass ? 'Hide' : 'Show';
+});
+
+document.getElementById('set-test-llm-btn')?.addEventListener('click', () => {
+  testLLMConnection('set');
+});
+
+document.getElementById('set-test-local-btn')?.addEventListener('click', () => {
+  probeLocalOllama('set');
+});
+
+document.getElementById('active-project-model-badge')?.addEventListener('click', () => {
+  const settingsTabBtn = document.querySelector('button[data-tab="settings"]');
+  if (settingsTabBtn) settingsTabBtn.click();
+});
+
 document.getElementById('settings-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!activeProjectId) return;
@@ -698,16 +1057,46 @@ document.getElementById('settings-form').addEventListener('submit', async (e) =>
     .value.split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+
+  const runtime = document.getElementById('set-runtime').value;
+  let provider = 'gemini';
+  let model = 'gemini-2.5-flash';
+  let endpoint = null;
+
+  if (runtime === 'cloud_api') {
+    provider = document.getElementById('set-llm-provider').value;
+    const mSelect = document.getElementById('set-llm-model-select');
+    const mCustom = document.getElementById('set-llm-model-custom');
+    model = mSelect?.value === '__custom__' ? (mCustom?.value.trim() || 'gemini-2.5-flash') : (mSelect?.value || 'gemini-2.5-flash');
+  } else if (runtime === 'local_llm') {
+    provider = 'ollama';
+    endpoint = document.getElementById('set-local-endpoint').value.trim();
+    const lSelect = document.getElementById('set-local-model-select');
+    const lCustom = document.getElementById('set-local-model-custom');
+    model = lSelect?.value === '__custom__' ? (lCustom?.value.trim() || 'qwen2.5-coder:7b') : (lSelect?.value || 'qwen2.5-coder:7b');
+  }
+
+  const rawKey = document.getElementById('set-llm-key').value.trim();
+
+  const payload = {
+    name: document.getElementById('set-name').value.trim(),
+    goal: document.getElementById('set-goal').value.trim(),
+    runtime_mode: runtime,
+    llm_provider: provider,
+    llm_model: model,
+    llm_endpoint: endpoint,
+    assigned_agents: agents,
+  };
+  if (rawKey) {
+    payload.llm_api_key = rawKey;
+  }
+
   try {
     await apiFetch(`/api/projects/${activeProjectId}`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        name: document.getElementById('set-name').value.trim(),
-        goal: document.getElementById('set-goal').value.trim(),
-        runtime_mode: document.getElementById('set-runtime').value,
-        assigned_agents: agents,
-      }),
+      body: JSON.stringify(payload),
     });
+    showToast('Project configuration & model settings saved successfully.');
     await loadProjects();
   } catch (err) {
     showToast(err.message);
@@ -770,7 +1159,7 @@ document.getElementById('chat-form').addEventListener('submit', async (e) => {
       const wRes = await fetch(`${LOCAL_WORKER_URL}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: msg }),
+        body: JSON.stringify({ prompt: msg, model: currentProj.llm_model || 'qwen2.5-coder:7b' }),
       });
       if (wRes.ok) {
         const wData = await wRes.json();

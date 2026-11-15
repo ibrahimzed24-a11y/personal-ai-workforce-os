@@ -27,6 +27,10 @@ LOCAL_PROJECTS = [
         "name": "valioz health sales",
         "goal": "draft email campaigns , schedule and send emails",
         "runtime_mode": "antigravity",
+        "llm_provider": "gemini",
+        "llm_model": "gemini-2.5-flash",
+        "has_api_key": False,
+        "llm_endpoint": "",
         "assigned_agents": ["coordinator", "browser-researcher", "email-operator", "report-compiler"],
         "status": "active"
     }
@@ -125,6 +129,54 @@ async def local_list_projects():
     return {"projects": LOCAL_PROJECTS}
 
 
+@app.get("/api/models/providers")
+async def local_models_providers():
+    from api.index import LLM_PROVIDERS_CATALOG
+    return {"providers": list(LLM_PROVIDERS_CATALOG.values())}
+
+
+@app.post("/api/models/test")
+async def local_test_model(payload: dict):
+    from api.index import call_llm
+    try:
+        res = await call_llm(
+            provider=payload.get("provider", "gemini"),
+            model=payload.get("model", "gemini-2.5-flash"),
+            api_key=payload.get("api_key"),
+            endpoint=payload.get("endpoint"),
+            system_prompt="You are an AI diagnostic test bot. Reply with OK.",
+            user_prompt="Ping",
+            timeout=10.0
+        )
+        return {
+            "status": "ok",
+            "latency_ms": res.get("latency_ms", 0),
+            "provider": payload.get("provider"),
+            "model": payload.get("model"),
+            "reply": res.get("content", "").strip()[:60]
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "provider": payload.get("provider"),
+            "model": payload.get("model"),
+            "error": str(exc)
+        }
+
+
+@app.get("/api/models/local/tags")
+async def local_ollama_tags():
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            r = await client.get(f"{OLLAMA_URL}/api/tags")
+            if r.status_code == 200:
+                models = [m.get("name") for m in r.json().get("models", [])]
+                return {"status": "ok", "models": models, "endpoint": OLLAMA_URL}
+    except Exception:
+        pass
+    return {"status": "offline", "models": ["qwen2.5-coder:7b", "llama3.1:8b"], "endpoint": OLLAMA_URL}
+
+
 @app.post("/api/projects")
 async def local_create_project(payload: dict):
     import uuid
@@ -133,11 +185,33 @@ async def local_create_project(payload: dict):
         "name": payload.get("name", "New Project"),
         "goal": payload.get("goal", ""),
         "runtime_mode": payload.get("runtime_mode", "antigravity"),
-        "assigned_agents": ["coordinator", "browser-researcher", "email-operator", "report-compiler"],
+        "llm_provider": payload.get("llm_provider", "gemini"),
+        "llm_model": payload.get("llm_model", "gemini-2.5-flash"),
+        "has_api_key": bool(payload.get("llm_api_key")),
+        "llm_endpoint": payload.get("llm_endpoint", ""),
+        "assigned_agents": payload.get("assigned_agents") or ["coordinator", "browser-researcher", "email-operator", "report-compiler"],
         "status": "active"
     }
     LOCAL_PROJECTS.insert(0, new_p)
     return {"project": new_p}
+
+
+@app.patch("/api/projects/{project_id}")
+async def local_update_project(project_id: str, payload: dict):
+    for p in LOCAL_PROJECTS:
+        if p["id"] == project_id:
+            p.update({k: v for k, v in payload.items() if v is not None})
+            if "llm_api_key" in payload:
+                p["has_api_key"] = bool(payload["llm_api_key"])
+            return {"project": p}
+    raise HTTPException(status_code=404, detail="Project not found")
+
+
+@app.delete("/api/projects/{project_id}")
+async def local_delete_project(project_id: str):
+    global LOCAL_PROJECTS
+    LOCAL_PROJECTS = [p for p in LOCAL_PROJECTS if p["id"] != project_id]
+    return {"status": "deleted", "id": project_id}
 
 
 @app.get("/api/projects/{project_id}/workspace")

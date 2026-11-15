@@ -62,3 +62,55 @@ def test_csv_and_xlsx_harness_parsing():
     assert xlsx_parsed["row_count"] == 1
     assert "Decision Maker" in xlsx_parsed["columns"]
     assert "Valioz Health" in xlsx_parsed["extracted_text"]
+
+
+def test_llm_providers_catalog():
+    res = cloud_client.get("/api/models/providers")
+    assert res.status_code == 200
+    providers = res.json().get("providers", [])
+    provider_ids = [p["id"] for p in providers]
+    assert "gemini" in provider_ids
+    assert "openai" in provider_ids
+    assert "anthropic" in provider_ids
+    assert "groq" in provider_ids
+    assert "deepseek" in provider_ids
+    assert "openrouter" in provider_ids
+    assert "ollama" in provider_ids
+
+    # Also verify local worker has provider parity
+    local_res = worker_client.get("/api/models/providers")
+    assert local_res.status_code == 200
+    local_ids = [p["id"] for p in local_res.json().get("providers", [])]
+    assert "gemini" in local_ids
+    assert "ollama" in local_ids
+
+
+def test_llm_test_endpoint():
+    # Diagnostic test call returns structured status (ok or error) with latency
+    res = cloud_client.post(
+        "/api/models/test",
+        json={"provider": "gemini", "model": "gemini-2.5-flash", "api_key": "fake_test_key"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["provider"] == "gemini"
+    assert data["model"] == "gemini-2.5-flash"
+    assert "status" in data
+
+
+def test_project_llm_configuration_and_sanitization():
+    from api.index import sanitize_project_for_client
+    raw_project = {
+        "id": "test_proj_123",
+        "name": "Valioz Sales Outreach",
+        "runtime_mode": "cloud_api",
+        "llm_provider": "claude",
+        "llm_model": "claude-3-7-sonnet-20250219",
+        "llm_api_key": encrypt_secret("sk-ant-test-secret-key-12345"),
+        "llm_endpoint": None,
+    }
+    sanitized = sanitize_project_for_client(raw_project)
+    assert sanitized["has_api_key"] is True
+    assert sanitized["llm_api_key"] == "••••••••"
+    assert sanitized["llm_provider"] == "claude"
+    assert sanitized["llm_model"] == "claude-3-7-sonnet-20250219"

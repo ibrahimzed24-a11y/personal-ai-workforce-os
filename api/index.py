@@ -23,6 +23,19 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# Load local .env if present
+_env_path = ROOT_DIR / ".env"
+if _env_path.exists():
+    try:
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip("'\""))
+    except Exception:
+        pass
+
 app = FastAPI(title="Personal AI Workforce OS v3.0", version="3.0.0")
 
 # --- Vercel Rewrite URL Path Normalizer Middleware ---
@@ -75,7 +88,190 @@ def get_cipher() -> Fernet:
 
 
 def encrypt_secret(plain: str) -> str:
+    if not plain:
+        return ""
     return get_cipher().encrypt(plain.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_secret(cipher_text: str) -> str:
+    if not cipher_text:
+        return ""
+    try:
+        return get_cipher().decrypt(cipher_text.encode("utf-8")).decode("utf-8")
+    except Exception:
+        return cipher_text
+
+
+# --- LLM Providers & Models Catalog ---
+LLM_PROVIDERS_CATALOG = {
+    "gemini": {
+        "id": "gemini",
+        "name": "Google Gemini",
+        "category": "cloud",
+        "default_model": "gemini-2.5-flash",
+        "models": ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
+        "api_key_env": "GEMINI_API_KEY",
+        "doc_url": "https://aistudio.google.com/app/apikey"
+    },
+    "openai": {
+        "id": "openai",
+        "name": "OpenAI",
+        "category": "cloud",
+        "default_model": "gpt-4o-mini",
+        "models": ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "o1-mini"],
+        "api_key_env": "OPENAI_API_KEY",
+        "doc_url": "https://platform.openai.com/api-keys"
+    },
+    "anthropic": {
+        "id": "anthropic",
+        "name": "Anthropic Claude",
+        "category": "cloud",
+        "default_model": "claude-3-5-sonnet-20241022",
+        "models": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"],
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "doc_url": "https://console.anthropic.com/settings/keys"
+    },
+    "groq": {
+        "id": "groq",
+        "name": "Groq",
+        "category": "cloud",
+        "default_model": "llama-3.3-70b-versatile",
+        "models": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"],
+        "api_key_env": "GROQ_API_KEY",
+        "doc_url": "https://console.groq.com/keys"
+    },
+    "deepseek": {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "category": "cloud",
+        "default_model": "deepseek-chat",
+        "models": ["deepseek-chat", "deepseek-reasoner"],
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "doc_url": "https://platform.deepseek.com/api_keys"
+    },
+    "openrouter": {
+        "id": "openrouter",
+        "name": "OpenRouter",
+        "category": "cloud",
+        "default_model": "meta-llama/llama-3.3-70b-instruct",
+        "models": ["anthropic/claude-3.5-sonnet", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1", "google/gemini-2.0-flash-exp:free"],
+        "api_key_env": "OPENROUTER_API_KEY",
+        "doc_url": "https://openrouter.ai/keys"
+    },
+    "ollama": {
+        "id": "ollama",
+        "name": "Local Ollama (MacBook Pro)",
+        "category": "local",
+        "default_model": "qwen2.5-coder:7b",
+        "models": ["qwen2.5-coder:7b", "llama3.1:8b", "mistral:7b", "deepseek-coder:6.7b", "phi3:mini"],
+        "endpoint": "http://127.0.0.1:11434",
+        "doc_url": "https://ollama.com"
+    }
+}
+
+
+# --- Unified Multi-Provider LLM Caller ---
+async def call_llm(
+    provider: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    api_key: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    timeout: float = 30.0
+) -> Dict[str, Any]:
+    started = time.perf_counter()
+    prov = (provider or "gemini").lower()
+    mod = model or (LLM_PROVIDERS_CATALOG.get(prov, {}).get("default_model") or "gemini-2.5-flash")
+    key = api_key or os.getenv(LLM_PROVIDERS_CATALOG.get(prov, {}).get("api_key_env", ""), "")
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        # 1. Google Gemini
+        if prov == "gemini":
+            if not key:
+                raise ValueError("Missing Gemini API Key.")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{mod}:generateContent?key={key}"
+            payload = {
+                "system_instruction": {"parts": [{"text": system_prompt}]},
+                "contents": [{"parts": [{"text": user_prompt}]}],
+            }
+            res = await client.post(url, json=payload)
+            if res.status_code != 200:
+                raise ValueError(f"Gemini API Error ({res.status_code}): {res.text}")
+            content = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+            latency = int((time.perf_counter() - started) * 1000)
+            return {"content": content, "latency_ms": latency, "provider": prov, "model": mod}
+
+        # 2. Anthropic Claude
+        elif prov in ("anthropic", "claude"):
+            if not key:
+                key = os.getenv("ANTHROPIC_API_KEY")
+            if not key:
+                raise ValueError("Missing Anthropic API Key.")
+            headers = {
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            }
+            payload = {
+                "model": mod,
+                "max_tokens": 4096,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_prompt}],
+            }
+            res = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            if res.status_code != 200:
+                raise ValueError(f"Anthropic API Error ({res.status_code}): {res.text}")
+            content = res.json()["content"][0]["text"]
+            latency = int((time.perf_counter() - started) * 1000)
+            return {"content": content, "latency_ms": latency, "provider": prov, "model": mod}
+
+        # 3. OpenAI or OpenAI-Compatible (Groq, DeepSeek, OpenRouter)
+        elif prov in ("openai", "groq", "deepseek", "openrouter"):
+            if not key:
+                raise ValueError(f"Missing API Key for {prov.title()}.")
+            base_urls = {
+                "openai": "https://api.openai.com/v1/chat/completions",
+                "groq": "https://api.groq.com/openai/v1/chat/completions",
+                "deepseek": "https://api.deepseek.com/chat/completions",
+                "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+            }
+            url = base_urls.get(prov, base_urls["openai"])
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            payload = {
+                "model": mod,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            }
+            res = await client.post(url, headers=headers, json=payload)
+            if res.status_code != 200:
+                raise ValueError(f"{prov.title()} API Error ({res.status_code}): {res.text}")
+            content = res.json()["choices"][0]["message"]["content"]
+            latency = int((time.perf_counter() - started) * 1000)
+            return {"content": content, "latency_ms": latency, "provider": prov, "model": mod}
+
+        # 4. Local Ollama (Direct or via local bridge daemon)
+        elif prov == "ollama":
+            base_url = (endpoint or "http://127.0.0.1:11434").rstrip("/")
+            res = await client.post(
+                f"{base_url}/api/generate",
+                json={
+                    "model": mod,
+                    "system": system_prompt,
+                    "prompt": user_prompt,
+                    "stream": False,
+                },
+            )
+            if res.status_code != 200:
+                raise ValueError(f"Local Ollama Error ({res.status_code}): {res.text}")
+            content = res.json().get("response", "")
+            latency = int((time.perf_counter() - started) * 1000)
+            return {"content": content, "latency_ms": latency, "provider": prov, "model": mod}
+
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
 
 
 # --- Document & Harness File Parsing ---
@@ -194,7 +390,11 @@ def parse_project_file(file_name: str, raw_bytes: bytes) -> Dict[str, Any]:
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=120)
     goal: str = Field(default="")
-    runtime_mode: str = Field(default="antigravity")
+    runtime_mode: str = Field(default="cloud_api") # 'antigravity', 'local_llm', 'cloud_api'
+    llm_provider: str = Field(default="gemini") # 'gemini', 'openai', 'anthropic', 'groq', 'deepseek', 'openrouter', 'ollama'
+    llm_model: str = Field(default="gemini-2.5-flash")
+    llm_api_key: Optional[str] = None
+    llm_endpoint: Optional[str] = None
     assigned_agents: List[str] = Field(
         default=["coordinator", "browser-researcher", "email-operator", "report-compiler"]
     )
@@ -204,8 +404,19 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     goal: Optional[str] = None
     runtime_mode: Optional[str] = None
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_endpoint: Optional[str] = None
     assigned_agents: Optional[List[str]] = None
     status: Optional[str] = None
+
+
+class LLMTestRequest(BaseModel):
+    provider: str
+    model: str
+    api_key: Optional[str] = None
+    endpoint: Optional[str] = None
 
 
 class VaultItemCreate(BaseModel):
@@ -293,10 +504,53 @@ async def health():
         "supabase_ready": bool(SUPABASE_URL and SUPABASE_ANON_KEY),
         "cloud_llm_ready": bool(os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")),
         "harness_formats": ["pdf", "csv", "xlsx", "txt", "json"],
+        "supported_llms": list(LLM_PROVIDERS_CATALOG.keys()),
     }
 
 
+# --- LLM Providers & Models Endpoints ---
+@app.get("/api/models/providers")
+async def list_llm_providers():
+    return {"providers": list(LLM_PROVIDERS_CATALOG.values())}
+
+
+@app.post("/api/models/test")
+async def test_llm_connection(req: LLMTestRequest):
+    try:
+        res = await call_llm(
+            provider=req.provider,
+            model=req.model,
+            api_key=req.api_key,
+            endpoint=req.endpoint,
+            system_prompt="You are an AI diagnostic bot. Reply with exactly the word OK.",
+            user_prompt="Ping",
+            timeout=12.0
+        )
+        return {
+            "status": "ok",
+            "latency_ms": res.get("latency_ms", 0),
+            "provider": req.provider,
+            "model": req.model,
+            "reply": res.get("content", "").strip()[:60]
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "provider": req.provider,
+            "model": req.model,
+            "error": str(exc)
+        }
+
+
 # --- Projects CRUD ---
+def sanitize_project_for_client(p: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = dict(p)
+    raw_key = sanitized.get("llm_api_key")
+    sanitized["has_api_key"] = bool(raw_key)
+    sanitized["llm_api_key"] = "••••••••" if raw_key else ""
+    return sanitized
+
+
 @app.get("/api/projects")
 async def list_projects(user: Dict[str, Any] = Depends(get_authenticated_user)):
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -306,16 +560,22 @@ async def list_projects(user: Dict[str, Any] = Depends(get_authenticated_user)):
         )
     if res.status_code >= 400:
         raise HTTPException(status_code=res.status_code, detail=res.text)
-    return {"projects": res.json()}
+    projects = [sanitize_project_for_client(p) for p in res.json()]
+    return {"projects": projects}
 
 
 @app.post("/api/projects")
 async def create_project(payload: ProjectCreate, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    encrypted_key = encrypt_secret(payload.llm_api_key) if payload.llm_api_key else None
     body = {
         "user_id": user["id"],
         "name": payload.name.strip(),
         "goal": payload.goal.strip(),
         "runtime_mode": payload.runtime_mode,
+        "llm_provider": payload.llm_provider,
+        "llm_model": payload.llm_model,
+        "llm_api_key": encrypted_key,
+        "llm_endpoint": payload.llm_endpoint,
         "assigned_agents": payload.assigned_agents,
     }
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -326,12 +586,22 @@ async def create_project(payload: ProjectCreate, user: Dict[str, Any] = Depends(
         )
     if res.status_code >= 400:
         raise HTTPException(status_code=res.status_code, detail=res.text)
-    return {"project": res.json()[0]}
+    return {"project": sanitize_project_for_client(res.json()[0])}
 
 
 @app.patch("/api/projects/{project_id}")
 async def update_project(project_id: str, payload: ProjectUpdate, user: Dict[str, Any] = Depends(get_authenticated_user)):
     updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if "llm_api_key" in updates:
+        raw_key = updates["llm_api_key"].strip()
+        # Only overwrite if key is changed and not placeholder
+        if raw_key and raw_key != "••••••••":
+            updates["llm_api_key"] = encrypt_secret(raw_key)
+        elif raw_key == "":
+            updates["llm_api_key"] = None
+        else:
+            updates.pop("llm_api_key", None)
+
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     async with httpx.AsyncClient(timeout=10.0) as client:
         res = await client.patch(
@@ -341,7 +611,7 @@ async def update_project(project_id: str, payload: ProjectUpdate, user: Dict[str
         )
     if res.status_code >= 400:
         raise HTTPException(status_code=res.status_code, detail=res.text)
-    return {"project": res.json()[0]}
+    return {"project": sanitize_project_for_client(res.json()[0])}
 
 
 @app.delete("/api/projects/{project_id}")
@@ -553,7 +823,7 @@ async def generate_bilingual_coordinator_reply(
     documents: List[Dict[str, Any]],
     user_message: str,
     is_ar: bool,
-) -> str:
+) -> Dict[str, Any]:
     tool_names = ", ".join([t["tool_name"] for t in tools]) if tools else ("لا توجد أدوات مربوطة بعد" if is_ar else "No saved tools yet")
     agents_list = ", ".join(project.get("assigned_agents", []))
 
@@ -596,54 +866,56 @@ async def generate_bilingual_coordinator_reply(
         "Explain clearly which agent handles each step, how the harness data and saved tools are used, and provide a concise Admin Summary."
     )
 
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
-    openai_key = os.getenv("OPENAI_API_KEY", "")
+    # 1. Resolve project LLM configuration
+    provider = project.get("llm_provider") or "gemini"
+    model = project.get("llm_model") or "gemini-2.5-flash"
+    encrypted_key = project.get("llm_api_key")
+    decrypted_key = decrypt_secret(encrypted_key) if encrypted_key else None
+    endpoint = project.get("llm_endpoint")
 
     try:
-        async with httpx.AsyncClient(timeout=25.0) as client:
-            if gemini_key:
-                res = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}",
-                    json={
-                        "system_instruction": {"parts": [{"text": system_prompt}]},
-                        "contents": [{"parts": [{"text": user_message}]}],
-                    },
-                )
-                if res.status_code == 200:
-                    return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-
-            if openai_key:
-                res = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {openai_key}"},
-                    json={
-                        "model": "gpt-4o-mini",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_message},
-                        ],
-                    },
-                )
-                if res.status_code == 200:
-                    return res.json()["choices"][0]["message"]["content"]
-    except Exception:
-        pass
-
-    if is_ar:
-        return (
-            f"تم استلام توجيهك لمشروع «{project['name']}».\n"
-            f"• الفريق المخصص: {agents_list}\n"
-            f"• الأدوات المتاحة: {tool_names}\n"
-            f"• ملفات الداتا والهارنس المربوطة:\n{docs_summary_str}\n"
-            f"• الخطوة التالية: تم توجيه الـ Agents بالاعتماد على الداتا المرفوعة كمرجع أساسي لتنفيذ المهمة بدقة."
+        llm_res = await call_llm(
+            provider=provider,
+            model=model,
+            api_key=decrypted_key,
+            endpoint=endpoint,
+            system_prompt=system_prompt,
+            user_prompt=user_message,
+            timeout=25.0
         )
-    return (
-        f"Directive received for project '{project['name']}'.\n"
-        f"• Assigned Team: {agents_list}\n"
-        f"• Authorized Tools: {tool_names}\n"
-        f"• Core Data Harness:\n{docs_summary_str}\n"
-        f"• Status: Sequential handoff completed using core project files as reference harness."
-    )
+        return {
+            "content": llm_res["content"],
+            "runtime_used": f"{provider.title()} ({model})",
+            "latency_ms": llm_res.get("latency_ms", 0)
+        }
+    except Exception as exc:
+        # Fallback coordinator reply when external LLM has network issue or missing key
+        prov_label = provider.title() if provider else "Cloud API"
+        if is_ar:
+            fallback = (
+                f"تم استلام توجيهك لمشروع «{project['name']}».\n"
+                f"• المحرك المخصص: {prov_label} ({model})\n"
+                f"• الفريق المخصص: {agents_list}\n"
+                f"• الأدوات المتاحة: {tool_names}\n"
+                f"• ملفات الداتا والهارنس المربوطة:\n{docs_summary_str}\n"
+                f"• الخطوة التالية: تم توجيه الـ Agents بالاعتماد على الداتا المرفوعة كمرجع أساسي لتنفيذ المهمة بدقة.\n"
+                f"ملاحظة: تأكد من ضبط الـ API Key في Project Settings لتفعيل الذكاء المباشر."
+            )
+        else:
+            fallback = (
+                f"Directive received for project '{project['name']}'.\n"
+                f"• Execution Engine: {prov_label} ({model})\n"
+                f"• Assigned Team: {agents_list}\n"
+                f"• Authorized Tools: {tool_names}\n"
+                f"• Core Data Harness:\n{docs_summary_str}\n"
+                f"• Status: Sequential handoff completed using core project files as reference harness.\n"
+                f"Note: Configure your provider API Key in Project Settings for live LLM responses."
+            )
+        return {
+            "content": fallback,
+            "runtime_used": f"{prov_label} ({model}) [Deterministic Fallback]",
+            "latency_ms": 0
+        }
 
 
 @app.post("/api/chat")
@@ -697,10 +969,11 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
 
         if payload.local_worker_output:
             final_reply = payload.local_worker_output
-            runtime_used = "local_llm (127.0.0.1:8765)"
+            runtime_used = f"Local LLM ({project.get('llm_model', 'qwen2.5-coder:7b')})"
         else:
-            final_reply = await generate_bilingual_coordinator_reply(project, tools, documents, payload.message.strip(), is_ar)
-            runtime_used = project.get("runtime_mode", "antigravity")
+            coord_res = await generate_bilingual_coordinator_reply(project, tools, documents, payload.message.strip(), is_ar)
+            final_reply = coord_res["content"]
+            runtime_used = coord_res["runtime_used"]
 
         now_iso = datetime.now(timezone.utc).isoformat()
         handoff_steps = [
@@ -721,7 +994,7 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
             {
                 "step": 3,
                 "agent": agents[-1] if len(agents) > 2 else "report-compiler",
-                "action": "Compiled plain-language Admin Report grounded in core files",
+                "action": f"Compiled plain-language Admin Report grounded in core files via {runtime_used}",
                 "status": "completed",
                 "timestamp": now_iso,
             },
@@ -752,7 +1025,7 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
                 "user_id": user["id"],
                 "project_id": payload.project_id,
                 "sender_role": "coordinator",
-                "sender_name": "Lead Coordinator",
+                "sender_name": f"Coordinator ({project.get('llm_model', 'Default')})",
                 "content": final_reply,
                 "language": lang,
             },

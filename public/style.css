@@ -214,10 +214,43 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .modal-card { background: var(--surface); border-radius: 14px; padding: 1.75rem; width: 100%; max-width: 520px; border: 1px solid var(--border); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.65rem; margin-top: 0.5rem; }
 
+/* Project Header Model Badge */
+.project-title-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.model-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 600;
+  padding: 0.25rem 0.65rem; border-radius: 9999px; background: var(--surface-alt);
+  border: 1px solid var(--border); color: var(--muted); transition: all 0.15s ease;
+}
+.model-badge.clickable { cursor: pointer; }
+.model-badge.clickable:hover { border-color: var(--accent); color: var(--accent-hover); background: var(--accent-soft); }
+.model-badge-cloud { background: #EFF6FF; border-color: #BFDBFE; color: #1D4ED8; }
+.model-badge-local { background: #FAF5FF; border-color: #E9D5FF; color: #7E22CE; }
+.model-badge-default { background: var(--accent-soft); border-color: #A7F3D0; color: var(--accent-hover); }
+
+/* LLM Configuration Sub-Panels */
+.config-panel {
+  border: 1px solid var(--border); background: var(--surface-alt); border-radius: 10px;
+  padding: 1.15rem; margin: 0.75rem 0 1rem 0;
+}
+.config-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+.config-title { display: flex; align-items: center; gap: 0.45rem; font-size: 0.88rem; color: var(--text); }
+.badge-subtle { font-size: 0.7rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 0.18rem 0.5rem; border-radius: 6px; font-weight: 500; }
+.grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+.input-with-button { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.input-with-button input { margin-bottom: 0; flex: 1; }
+.btn-link-action { background: none; border: none; color: var(--accent); font-size: 0.76rem; cursor: pointer; text-decoration: underline; padding: 0; font-weight: 600; }
+.key-status-hint { font-size: 0.75rem; color: var(--muted); font-weight: normal; margin-left: 0.4rem; }
+.status-feedback { font-size: 0.8rem; padding: 0.45rem 0.75rem; border-radius: 6px; margin-top: 0.4rem; display: flex; align-items: center; gap: 0.45rem; }
+.status-feedback.success { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.status-feedback.error { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+.status-feedback.loading { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.model-select-wrap { display: flex; flex-direction: column; gap: 0.4rem; }
+
 @media (max-width: 860px) {
   .workspace { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .grid-form { grid-template-columns: 1fr; }
+  .grid-2col { grid-template-columns: 1fr; }
   .project-header { padding: 1rem; }
   .chat-feed { padding: 1rem; }
   .chat-composer { padding: 0.75rem 1rem; }
