@@ -1870,3 +1870,489 @@ body {
     }
 }
 
+
+
+/* ==========================================================================
+   FounderOS-Inspired Command Center & Executive HUD Additions
+   ========================================================================== */
+
+/* --- Topbar Search / Command Palette Button --- */
+.search-command-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    padding: 7px 12px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    outline: none;
+}
+
+.search-command-btn:hover {
+    border-color: var(--border-focus);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    background: var(--bg-body);
+}
+
+.search-command-btn .icon {
+    font-size: 14px;
+}
+
+.search-command-btn kbd {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* --- Executive HUD: Needs You & Done Today Dual Cards --- */
+.hud-dual-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.hud-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 16px 20px;
+    box-shadow: var(--shadow-xs);
+    transition: var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+}
+
+.hud-card:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-hover);
+}
+
+.hud-card.needs-you {
+    border-left: 4px solid var(--warning);
+}
+
+.hud-card.done-today {
+    border-left: 4px solid var(--success);
+}
+
+.hud-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.hud-card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hud-card-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.hud-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.hud-badge.warn {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+}
+
+.hud-badge.success {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+}
+
+.hud-badge.neutral {
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+
+.hud-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    flex: 1;
+}
+
+.hud-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.hud-item:hover {
+    background: #ffffff;
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow-xs);
+}
+
+.hud-item-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+
+.hud-item-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hud-empty-state {
+    padding: 18px 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    background: var(--bg-body);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--border-color);
+}
+
+/* --- Executive Telemetry Strip (FounderOS Inspired) --- */
+.telemetry-executive-panel {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    box-shadow: var(--shadow-xs);
+    display: grid;
+    grid-template-columns: 200px 1fr 220px;
+    gap: 24px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+    .telemetry-executive-panel {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+}
+
+.gauge-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.gauge-svg {
+    width: 150px;
+    height: 110px;
+}
+
+.h6-drows-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    justify-content: center;
+}
+
+.h6-drow {
+    display: flex;
+    align-items: center;
+    font-size: 12.5px;
+    padding: 2px 0;
+}
+
+.h6-drow-label {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.h6-drow-lead {
+    flex: 1;
+    border-bottom: 1px dotted var(--border-color);
+    margin: 0 8px;
+}
+
+.h6-drow-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+.matrix-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 8px;
+}
+
+@media (max-width: 900px) {
+    .matrix-box {
+        align-items: flex-start;
+    }
+}
+
+.matrix-svg {
+    width: 100%;
+    max-width: 200px;
+    height: 65px;
+}
+
+/* --- Department Forcespace Filter Pills --- */
+.forcespace-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.forcespace-filter-bar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.forcespace-filter-bar::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition-fast);
+}
+
+.filter-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--bg-blue-subtle);
+}
+
+.filter-pill.active {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
+/* --- Command Palette Modal (Cmd+K) --- */
+.palette-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 12vh;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+}
+
+.palette-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.palette-modal {
+    background: #ffffff;
+    width: 100%;
+    max-width: 620px;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    transform: translateY(-8px) scale(0.98);
+    transition: transform 0.18s ease;
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+}
+
+.palette-backdrop.active .palette-modal {
+    transform: translateY(0) scale(1);
+}
+
+.palette-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.palette-search-icon {
+    font-size: 18px;
+    color: var(--text-muted);
+}
+
+.palette-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    color: var(--text-primary);
+    background: transparent;
+    font-family: inherit;
+}
+
+.palette-search-input::placeholder {
+    color: var(--text-light);
+}
+
+.palette-results {
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.palette-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 8px 10px 4px 10px;
+}
+
+.palette-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.palette-item:hover, .palette-item.selected {
+    background: var(--bg-blue-subtle);
+    color: var(--accent);
+}
+
+.palette-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.palette-item-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.palette-item-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.palette-item-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-left: 6px;
+}
+
+.palette-item-shortcut {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg-subtle);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.palette-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    background: var(--bg-body);
+    border-top: 1px solid var(--border-color);
+    font-size: 11.5px;
+    color: var(--text-muted);
+}
+
+.palette-hints {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.palette-hints kbd {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 10.5px;
+    font-weight: 600;
+}

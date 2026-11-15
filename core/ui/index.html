@@ -20,6 +20,7 @@
             </div>
         </div>
         <div class="mobile-actions">
+            <button class="btn btn-secondary btn-sm" onclick="window.openCommandPalette()" title="Search or Cmd+K">🔍</button>
             <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()" title="Refresh data">⟳</button>
             <button class="btn btn-primary btn-sm" onclick="window.openNewProjectModal()">+ Project</button>
         </div>
@@ -105,6 +106,11 @@
                     <span class="topbar-subtitle" id="currentTabSubtitle">Voice & text autonomous prompting, active projects, and multi-agent execution</span>
                 </div>
                 <div class="actions">
+                    <button class="search-command-btn" onclick="window.openCommandPalette()" title="Search or press Cmd+K">
+                        <span class="icon">🔍</span>
+                        <span>Search Forcespace</span>
+                        <kbd>⌘K</kbd>
+                    </button>
                     <button class="btn btn-secondary" onclick="window.refreshActiveTab()">⟳ Refresh</button>
                     <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewProjectModal()">+ Create Project</button>
                 </div>
@@ -188,6 +194,90 @@
                         <!-- Loaded dynamically from recent tasks & chat interactions -->
                     </div>
 
+                    <!-- Executive HUD: Needs You & Done Today Dual Cards (FounderOS Pattern) -->
+                    <div class="hud-dual-grid" id="homeExecutiveHud">
+                        <!-- Needs You Card (Human-in-the-Loop Operator Gate) -->
+                        <div class="hud-card needs-you" id="hudNeedsYouCard">
+                            <div class="hud-card-header">
+                                <div class="hud-card-title-group">
+                                    <span style="font-size:16px;">⚠️</span>
+                                    <span class="hud-card-title">Needs You</span>
+                                </div>
+                                <span class="hud-badge neutral" id="needsYouCountPill">0 items</span>
+                            </div>
+                            <ul class="hud-list" id="needsYouList">
+                                <!-- Populated dynamically -->
+                            </ul>
+                        </div>
+
+                        <!-- Done Today Card (Autonomous Accomplishment Recap) -->
+                        <div class="hud-card done-today" id="hudDoneTodayCard">
+                            <div class="hud-card-header">
+                                <div class="hud-card-title-group">
+                                    <span style="font-size:16px;">🟢</span>
+                                    <span class="hud-card-title">Done Today</span>
+                                </div>
+                                <span class="hud-badge success" id="doneTodayCountPill">0 completed</span>
+                            </div>
+                            <ul class="hud-list" id="doneTodayList">
+                                <!-- Populated dynamically -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Executive Telemetry Strip (FounderOS Control Console) -->
+                    <div class="telemetry-executive-panel" id="executiveTelemetryPanel">
+                        <!-- Left: 220° Radial Health Gauge -->
+                        <div class="gauge-box">
+                            <svg class="gauge-svg" viewBox="0 0 160 120" role="img" aria-label="System Health">
+                                <path d="M 23 99 A 62 62 0 1 1 137 99" fill="none" stroke="#e2e8f0" stroke-width="10" stroke-linecap="round"></path>
+                                <path id="hudHealthArc" d="M 23 99 A 62 62 0 1 1 137 99" fill="none" stroke="#2563eb" stroke-width="10" stroke-linecap="round" stroke-dasharray="260" stroke-dashoffset="10"></path>
+                                <circle cx="80" cy="78" r="48" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="2 4"></circle>
+                                <text x="80" y="74" text-anchor="middle" font-size="24" font-weight="700" fill="#0f172a" id="hudHealthScore">98%</text>
+                                <text x="80" y="92" text-anchor="middle" font-size="10" font-weight="600" fill="#64748b">SOVEREIGN HEALTH</text>
+                            </svg>
+                            <span class="tag" style="background:var(--success-bg); color:var(--success); font-weight:600; font-size:11px;">✓ Local Node Online</span>
+                        </div>
+
+                        <!-- Center: Dotted-Leader Telemetry Rows -->
+                        <div class="h6-drows-group">
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Workstation Node</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val" id="hudNodeVal">MacBook Pro 15" · Online</span>
+                            </div>
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Cloud Operational Queue</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val" id="hudQueueVal">Supabase PostgREST · Active</span>
+                            </div>
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Agent Workforce</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val" id="hudWorkforceVal">32 Blueprints · Loaded</span>
+                            </div>
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Execution Policy</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val">5-Stage Deterministic Loop</span>
+                            </div>
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Sovereign Vault</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val">POSIX 0600 · Encrypted</span>
+                            </div>
+                        </div>
+
+                        <!-- Right: 7-Day Activity Dot Matrix -->
+                        <div class="matrix-box">
+                            <div style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">7-Day Run Activity</div>
+                            <svg class="matrix-svg" id="executiveMatrixSvg" viewBox="0 0 110 55" role="img" aria-label="7-day activity">
+                                <!-- Populated dynamically with 7 columns of dots -->
+                            </svg>
+                            <span style="font-size:11px; color:var(--text-muted);" id="hudWeeklyRunsCaption">7-day continuous verification</span>
+                        </div>
+                    </div>
+
                     <!-- 3. Projects Overview on Home Page -->
                     <div class="projects-section" id="homeProjectsSection">
                         <div class="projects-header">
@@ -196,6 +286,15 @@
                                 <span class="subtext">Create projects and assign tasks for agents inside each project</span>
                             </div>
                             <button class="btn btn-primary btn-sm" onclick="window.openNewProjectModal()">+ New Project</button>
+                        </div>
+
+                        <!-- Forcespace Department Filter Pills -->
+                        <div class="forcespace-filter-bar" id="forcespaceFilterBar">
+                            <button class="filter-pill active" onclick="window.filterForcespace('all')">🌐 All Forcespace (32)</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('engineering')">💻 Engineering & Dev</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('intelligence')">🔍 Intelligence & Research</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('growth')">📈 Growth & Marketing</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('operations')">👑 Command & Operations</button>
                         </div>
 
                         <div class="projects-grid" id="homeProjectsGrid">
@@ -867,6 +966,30 @@
                     <button type="submit" class="btn btn-primary">Encrypt & Store</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ==============================================================
+         FounderOS-Inspired Command Palette (Cmd+K / Ctrl+K)
+         ============================================================== -->
+    <div id="commandPaletteModal" class="palette-backdrop" onclick="window.handlePaletteBackdropClick(event)">
+        <div class="palette-modal" onclick="event.stopPropagation()">
+            <div class="palette-search-wrapper">
+                <span class="palette-search-icon">🔍</span>
+                <input type="text" id="paletteSearchInput" class="palette-search-input" placeholder="Type an agent name, project, command, or view..." autocomplete="off">
+                <kbd style="font-size:11px; color:var(--text-muted); background:var(--bg-subtle); padding:2px 6px; border-radius:4px; border:1px solid var(--border-color);">ESC</kbd>
+            </div>
+            <div class="palette-results" id="paletteResultsList">
+                <!-- Dynamically populated from 32 agents, projects, navigation, and actions -->
+            </div>
+            <div class="palette-footer">
+                <div class="palette-hints">
+                    <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+                    <span><kbd>↵</kbd> Select</span>
+                    <span><kbd>esc</kbd> Dismiss</span>
+                </div>
+                <span>⚡ AI Workforce Command Palette</span>
+            </div>
         </div>
     </div>
 

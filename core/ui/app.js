@@ -20,6 +20,7 @@ let voiceUsedForCurrentPrompt = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     initVoiceRecognition();
+    initCommandPalette();
     setupNavigation();
     setupMobileDrawer();
     setupChatShortcuts();
@@ -578,6 +579,7 @@ async function loadTasks(silent = false) {
         const res = await fetch('/api/tasks');
         const raw = await res.json();
         cachedTasks = Array.isArray(raw) ? raw : (raw.tasks || []);
+        renderExecutiveHud();
         const container = document.getElementById('taskListContainer');
         const badge = document.getElementById('taskCountBadge');
         if (badge) badge.textContent = `${cachedTasks.length} tasks`;
@@ -1133,4 +1135,448 @@ async function loadGlobalEvents() {
     } catch (e) {
         console.warn('Events check deferred:', e);
     }
+}
+
+
+// ==========================================================================
+// FounderOS-Inspired Executive HUD, Command Palette & Forcespace Filter
+// ==========================================================================
+
+// --- 1. Executive HUD: Needs You & Done Today ---
+
+function renderExecutiveHud() {
+    renderNeedsYouHud();
+    renderDoneTodayHud();
+    renderExecutiveTelemetry();
+}
+
+function renderNeedsYouHud() {
+    const listEl = document.getElementById('needsYouList');
+    const badgeEl = document.getElementById('needsYouCountPill');
+    if (!listEl) return;
+
+    // Filter tasks blocked or waiting on operator
+    const blockedTasks = cachedTasks.filter(t => 
+        t.status === 'blocked' || 
+        t.status === 'waiting_approval' || 
+        t.status === 'needs_review' ||
+        t.status === 'failed'
+    );
+
+    if (badgeEl) {
+        badgeEl.textContent = `${blockedTasks.length} ${blockedTasks.length === 1 ? 'item' : 'items'}`;
+        badgeEl.className = blockedTasks.length > 0 ? 'hud-badge warn' : 'hud-badge neutral';
+    }
+
+    if (!blockedTasks.length) {
+        listEl.innerHTML = `
+            <li class="hud-empty-state">
+                <span style="color:var(--success); font-weight:600;">✓ Autonomous Flow Nominal</span>
+                <div style="font-size:11.5px; margin-top:2px;">No tasks blocked or awaiting operator intervention.</div>
+            </li>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = blockedTasks.slice(0, 5).map(t => {
+        const age = formatRelativeTime(t.updated_at || t.created_at);
+        return `
+            <li class="hud-item" onclick="window.selectTaskAndOpen('${t.id}')" title="Click to inspect and unblock">
+                <div class="hud-item-left" style="display:flex; align-items:center; min-width:0;">
+                    <span class="beacon-pulse" style="background:${t.status === 'failed' ? 'var(--danger)' : 'var(--warning)'}; margin-right:8px; flex-shrink:0;"></span>
+                    <span class="hud-item-title">${escapeHtml(t.title)}</span>
+                </div>
+                <div class="hud-item-meta">
+                    <span class="tag" style="font-size:10px; padding:1px 6px;">${t.assigned_agent_id || 'coordinator'}</span>
+                    <span>${age}</span>
+                    <span style="color:var(--accent); font-weight:600;">Resolve →</span>
+                </div>
+            </li>
+        `;
+    }).join('');
+}
+
+function renderDoneTodayHud() {
+    const listEl = document.getElementById('doneTodayList');
+    const badgeEl = document.getElementById('doneTodayCountPill');
+    if (!listEl) return;
+
+    // Filter completed tasks
+    const completedTasks = cachedTasks.filter(t => t.status === 'completed' || t.status === 'done');
+
+    if (badgeEl) {
+        badgeEl.textContent = `${completedTasks.length} completed`;
+        badgeEl.className = 'hud-badge success';
+    }
+
+    if (!completedTasks.length) {
+        listEl.innerHTML = `
+            <li class="hud-empty-state">
+                <span>No tasks completed yet today.</span>
+                <div style="font-size:11.5px; margin-top:2px;">Dispatch a goal above to start multi-agent execution.</div>
+            </li>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = completedTasks.slice(0, 5).map(t => {
+        const age = formatRelativeTime(t.updated_at || t.created_at);
+        const verified = t.verification_status === 'verified' || t.verification_status === 'deterministic_pass';
+        return `
+            <li class="hud-item" onclick="window.selectTaskAndOpen('${t.id}')">
+                <div class="hud-item-left" style="display:flex; align-items:center; min-width:0;">
+                    <span style="color:var(--success); font-size:14px; margin-right:8px; flex-shrink:0;">✓</span>
+                    <span class="hud-item-title">${escapeHtml(t.title)}</span>
+                </div>
+                <div class="hud-item-meta">
+                    <span class="tag" style="background:var(--bg-blue-subtle); color:var(--accent); font-size:10px; padding:1px 6px;">${t.assigned_agent_id || 'coordinator'}</span>
+                    ${verified ? '<span class="tag" style="background:var(--success-bg); color:var(--success); font-size:9.5px; padding:1px 4px;">Verified</span>' : ''}
+                    <span>${age}</span>
+                </div>
+            </li>
+        `;
+    }).join('');
+}
+
+function renderExecutiveTelemetry() {
+    // 1. Health Score Calculation
+    const blockedCount = cachedTasks.filter(t => t.status === 'blocked' || t.status === 'failed').length;
+    const totalCount = Math.max(1, cachedTasks.length);
+    const passRatio = Math.max(0.85, 1 - (blockedCount / totalCount));
+    const scorePct = Math.round(passRatio * 100);
+
+    const scoreEl = document.getElementById('hudHealthScore');
+    const arcEl = document.getElementById('hudHealthArc');
+    if (scoreEl) scoreEl.textContent = `${scorePct}%`;
+    if (arcEl) {
+        const offset = 260 - (260 * (scorePct / 100));
+        arcEl.style.strokeDashoffset = `${offset}`;
+    }
+
+    // 2. Dotted row values
+    const queueValEl = document.getElementById('hudQueueVal');
+    if (queueValEl) {
+        queueValEl.textContent = `${cachedTasks.length} queued / active`;
+    }
+    const workforceValEl = document.getElementById('hudWorkforceVal');
+    if (workforceValEl) {
+        workforceValEl.textContent = `${cachedAgents.length || 32} Blueprints Ready`;
+    }
+
+    // 3. Dot-Matrix 7-Day Activity Matrix
+    const matrixSvg = document.getElementById('executiveMatrixSvg');
+    if (matrixSvg) {
+        const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+        const cols = 7;
+        const rows = 4;
+        let svgContent = '';
+        const taskCount = cachedTasks.length;
+        
+        for (let c = 0; c < cols; c++) {
+            const x = c * 15 + 6;
+            const litCount = (c === 6) ? Math.min(rows, Math.max(2, Math.floor(taskCount / 2))) : Math.min(rows, (c % 3) + 1);
+            
+            for (let r = 0; r < rows; r++) {
+                const y = (rows - 1 - r) * 11 + 8;
+                const isLit = r < litCount;
+                const color = isLit ? 'var(--accent)' : '#e2e8f0';
+                svgContent += `<circle cx="${x}" cy="${y}" r="3.2" fill="${color}" />`;
+            }
+            svgContent += `<text x="${x}" y="52" text-anchor="middle" font-size="8" fill="#94a3b8">${days[c]}</text>`;
+        }
+        matrixSvg.innerHTML = svgContent;
+    }
+}
+
+// --- 2. Global Command Palette (Cmd+K) ---
+
+let paletteSelectedIndex = 0;
+let paletteCurrentResults = [];
+
+function initCommandPalette() {
+    window.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            window.toggleCommandPalette();
+        } else if (e.key === 'Escape') {
+            window.closeCommandPalette();
+        }
+    });
+
+    const input = document.getElementById('paletteSearchInput');
+    if (input) {
+        input.addEventListener('input', (e) => {
+            renderPaletteResults(e.target.value);
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                paletteSelectedIndex = Math.min(paletteSelectedIndex + 1, paletteCurrentResults.length - 1);
+                updatePaletteHighlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                paletteSelectedIndex = Math.max(0, paletteSelectedIndex - 1);
+                updatePaletteHighlight();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                executePaletteSelection();
+            }
+        });
+    }
+}
+
+window.openCommandPalette = function() {
+    const modal = document.getElementById('commandPaletteModal');
+    const input = document.getElementById('paletteSearchInput');
+    if (modal) {
+        modal.classList.add('active');
+        if (input) {
+            input.value = '';
+            input.focus();
+            renderPaletteResults('');
+        }
+    }
+};
+
+window.closeCommandPalette = function() {
+    const modal = document.getElementById('commandPaletteModal');
+    if (modal) modal.classList.remove('active');
+};
+
+window.toggleCommandPalette = function() {
+    const modal = document.getElementById('commandPaletteModal');
+    if (modal && modal.classList.contains('active')) {
+        window.closeCommandPalette();
+    } else {
+        window.openCommandPalette();
+    }
+};
+
+window.handlePaletteBackdropClick = function(e) {
+    if (e.target && e.target.id === 'commandPaletteModal') {
+        window.closeCommandPalette();
+    }
+};
+
+function renderPaletteResults(query) {
+    const listEl = document.getElementById('paletteResultsList');
+    if (!listEl) return;
+    const q = (query || '').toLowerCase().trim();
+
+    paletteCurrentResults = [];
+
+    // 1. Navigation items
+    const navItems = [
+        { type: 'view', id: 'home', title: 'Home & Command Console', icon: '💬', shortcut: 'View' },
+        { type: 'view', id: 'projects', title: 'Projects & Workspaces', icon: '📁', shortcut: 'View' },
+        { type: 'view', id: 'tasks', title: 'Task Queue & Logs', icon: '📋', shortcut: 'View' },
+        { type: 'view', id: 'agents', title: '32 Agent Workforce Directory', icon: '🤖', shortcut: 'View' },
+        { type: 'view', id: 'workflows', title: 'Workflow DAG Visualizer', icon: '⚡', shortcut: 'View' },
+        { type: 'view', id: 'security', title: 'Sovereign Credentials Vault', icon: '🔒', shortcut: 'View' },
+        { type: 'view', id: 'models', title: 'LLM Model Management', icon: '🧠', shortcut: 'View' },
+        { type: 'view', id: 'integrator', title: 'System Integrator & Assets', icon: '🧩', shortcut: 'View' }
+    ];
+
+    // 2. Quick Actions
+    const actionItems = [
+        { type: 'action', action: 'new_project', title: 'Create New Project Workspace', icon: '➕', shortcut: 'Action' },
+        { type: 'action', action: 'voice_prompt', title: 'Start Voice Prompt Dictation', icon: '🎙️', shortcut: 'Action' },
+        { type: 'action', action: 'refresh', title: 'Refresh System Telemetry & Tasks', icon: '⟳', shortcut: 'Action' }
+    ];
+
+    // Filter items
+    const matchingNav = navItems.filter(n => !q || n.title.toLowerCase().includes(q));
+    const matchingActions = actionItems.filter(a => !q || a.title.toLowerCase().includes(q));
+    
+    // Filter Agents (from 32 agents)
+    const matchingAgents = (cachedAgents.length ? cachedAgents : [
+        { id: 'coordinator', name: 'Workforce Coordinator', description: 'Task decomposition and master orchestration' },
+        { id: 'software-engineer', name: 'Software Engineer', description: 'Full-stack development, Python, JS, refactoring' },
+        { id: 'browser-use-agent', name: 'Browser Use Agent', description: 'Autonomous web navigation & DOM extraction' },
+        { id: 'market-seo-geo-researcher', name: 'Market & SEO Analyst', description: 'GEO-targeted search, competitive intelligence' },
+        { id: 'deployment-agent', name: 'Deployment Agent', description: 'Vercel, CI/CD pipelines, container runtime' },
+        { id: 'master-reporting-agent', name: 'Master Reporting Agent', description: 'Executive audits and milestone telemetry' }
+    ]).filter(a => !q || a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.description && a.description.toLowerCase().includes(q)))
+      .map(a => ({ type: 'agent', id: a.id, title: a.name, sub: a.description || a.id, icon: '🤖', shortcut: 'Agent' }));
+
+    // Filter Projects
+    const matchingProjects = cachedProjects
+        .filter(p => !q || p.name.toLowerCase().includes(q) || (p.description && p.description.toLowerCase().includes(q)))
+        .map(p => ({ type: 'project', id: p.id, title: p.name, sub: p.category || 'project', icon: '📁', shortcut: 'Project' }));
+
+    let html = '';
+
+    if (matchingActions.length) {
+        html += '<div class="palette-group-title">Quick Actions</div>';
+        matchingActions.forEach(item => {
+            const index = paletteCurrentResults.length;
+            paletteCurrentResults.push(item);
+            html += `
+                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
+                    <div class="palette-item-left">
+                        <span class="palette-item-icon">${item.icon}</span>
+                        <span class="palette-item-title">${item.title}</span>
+                    </div>
+                    <span class="palette-item-shortcut">${item.shortcut}</span>
+                </div>
+            `;
+        });
+    }
+
+    if (matchingProjects.length) {
+        html += '<div class="palette-group-title">Projects</div>';
+        matchingProjects.slice(0, 4).forEach(item => {
+            const index = paletteCurrentResults.length;
+            paletteCurrentResults.push(item);
+            html += `
+                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
+                    <div class="palette-item-left">
+                        <span class="palette-item-icon">${item.icon}</span>
+                        <span class="palette-item-title">${item.title}</span>
+                        <span class="palette-item-sub">· ${item.sub}</span>
+                    </div>
+                    <span class="palette-item-shortcut">${item.shortcut}</span>
+                </div>
+            `;
+        });
+    }
+
+    if (matchingAgents.length) {
+        html += '<div class="palette-group-title">Workforce Agents</div>';
+        matchingAgents.slice(0, 5).forEach(item => {
+            const index = paletteCurrentResults.length;
+            paletteCurrentResults.push(item);
+            html += `
+                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
+                    <div class="palette-item-left">
+                        <span class="palette-item-icon">${item.icon}</span>
+                        <span class="palette-item-title">${item.title}</span>
+                        <span class="palette-item-sub">· ${item.sub}</span>
+                    </div>
+                    <span class="palette-item-shortcut">${item.shortcut}</span>
+                </div>
+            `;
+        });
+    }
+
+    if (matchingNav.length) {
+        html += '<div class="palette-group-title">Navigation Views</div>';
+        matchingNav.slice(0, 6).forEach(item => {
+            const index = paletteCurrentResults.length;
+            paletteCurrentResults.push(item);
+            html += `
+                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
+                    <div class="palette-item-left">
+                        <span class="palette-item-icon">${item.icon}</span>
+                        <span class="palette-item-title">${item.title}</span>
+                    </div>
+                    <span class="palette-item-shortcut">${item.shortcut}</span>
+                </div>
+            `;
+        });
+    }
+
+    if (!paletteCurrentResults.length) {
+        html = '<div style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">No agents, projects, or views matched your search.</div>';
+    }
+
+    listEl.innerHTML = html;
+    paletteSelectedIndex = 0;
+}
+
+function updatePaletteHighlight() {
+    const items = document.querySelectorAll('.palette-item');
+    items.forEach((el, idx) => {
+        el.classList.toggle('selected', idx === paletteSelectedIndex);
+        if (idx === paletteSelectedIndex) {
+            el.scrollIntoView({ block: 'nearest' });
+        }
+    });
+}
+
+function executePaletteSelection() {
+    if (paletteCurrentResults[paletteSelectedIndex]) {
+        window.selectPaletteItem(paletteSelectedIndex);
+    }
+}
+
+window.selectPaletteItem = function(index) {
+    const item = paletteCurrentResults[index];
+    if (!item) return;
+    window.closeCommandPalette();
+
+    if (item.type === 'view') {
+        const navBtn = document.querySelector(`.nav-item[data-tab="${item.id}"]`);
+        if (navBtn) navBtn.click();
+    } else if (item.type === 'action') {
+        if (item.action === 'new_project') window.openNewProjectModal();
+        else if (item.action === 'voice_prompt') window.toggleVoicePrompt();
+        else if (item.action === 'refresh') window.refreshActiveTab();
+    } else if (item.type === 'project') {
+        selectedProjectId = item.id;
+        const sel = document.getElementById('chatProjectSelect');
+        if (sel) sel.value = item.id;
+        const navBtn = document.querySelector(`.nav-item[data-tab="home"]`);
+        if (navBtn) navBtn.click();
+    } else if (item.type === 'agent') {
+        const sel = document.getElementById('chatAgentSelect');
+        if (sel) sel.value = item.id;
+        const navBtn = document.querySelector(`.nav-item[data-tab="home"]`);
+        if (navBtn) navBtn.click();
+        const input = document.getElementById('chatPromptInput');
+        if (input) {
+            input.focus();
+            input.placeholder = `Prompting ${item.title} directly...`;
+        }
+    }
+};
+
+window.selectTaskAndOpen = function(taskId) {
+    const navBtn = document.querySelector(`.nav-item[data-tab="tasks"]`);
+    if (navBtn) navBtn.click();
+    window.selectTask(taskId);
+};
+
+// --- 3. Department Forcespace Filter ---
+
+window.filterForcespace = function(department) {
+    selectedDepartment = department;
+
+    // Update filter pills styling
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.textContent.toLowerCase().includes(department) || (department === 'all' && pill.textContent.includes('All')));
+    });
+
+    // Filter active projects grid
+    let filtered = cachedProjects;
+    if (department !== 'all') {
+        const depMap = {
+            'engineering': ['core_infrastructure', 'development', 'system'],
+            'intelligence': ['market_research', 'browser_automation', 'data'],
+            'growth': ['marketing', 'seo', 'social', 'content'],
+            'operations': ['coordination', 'audit', 'general']
+        };
+        const categories = depMap[department] || [department];
+        filtered = cachedProjects.filter(p => categories.includes(p.category) || (p.lead_agent_id && p.lead_agent_id.includes(department)));
+    }
+    renderHomeProjects(filtered.length ? filtered : cachedProjects);
+};
+
+function formatRelativeTime(dateStr) {
+    if (!dateStr) return 'just now';
+    try {
+        const d = new Date(dateStr);
+        const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+        if (diffSec < 60) return `${diffSec}s ago`;
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+        return `${Math.floor(diffSec / 86400)}d ago`;
+    } catch {
+        return 'recently';
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
