@@ -6,15 +6,51 @@ from core.adapters.base import ModelProvider
 
 logger = logging.getLogger("ai_workforce_os.adapters.mock")
 
+
 class DeterministicMockProvider(ModelProvider):
     """
-    Deterministic, offline local reasoning engine.
-    Ensures the OS can formulate execution plans, synthesize deliverables,
-    and make decisions completely offline with zero API cost and zero network latency.
+    Deterministic, offline local reasoning engine (MOCKED_OR_SIMULATED).
+    Supports both Coordinator DAG planning and the 5-stage Agent Execution Loop
+    (Run Policy -> Think -> Act -> Observe -> Deterministic Code Check) across all 32 agents
+    by inspecting the agent's SKILL.md output schema and authorized capabilities.
     """
     def __init__(self, model_name: str = "mock-deterministic-v1"):
         self.model_name = model_name
         self.provider_id = "mock"
+
+    @staticmethod
+    def _synthesize_value_for_prop(prop_name: str, prop_spec: Dict[str, Any], agent_id: str, task_title: str) -> Any:
+        ptype = prop_spec.get("type", "string")
+        if ptype == "string":
+            if "path" in prop_name:
+                return f"logs/deliverable_{agent_id}.md"
+            if "status" in prop_name or "verdict" in prop_name:
+                return "verified"
+            if "id" in prop_name:
+                return f"{agent_id}_artifact_01"
+            return f"Executed {prop_name} for '{task_title}' via {agent_id}"
+        elif ptype == "array":
+            return [
+                {
+                    "item": f"{prop_name}_item_1",
+                    "agent": agent_id,
+                    "status": "completed",
+                    "detail": f"Verified step output for {task_title}"
+                }
+            ]
+        elif ptype == "object":
+            return {
+                "agent": agent_id,
+                "task": task_title,
+                "verified": True
+            }
+        elif ptype in ("number", "integer"):
+            if "score" in prop_name or "rate" in prop_name:
+                return 98
+            return 1
+        elif ptype == "boolean":
+            return True
+        return f"verified_{prop_name}"
 
     async def generate(
         self,
@@ -25,12 +61,14 @@ class DeterministicMockProvider(ModelProvider):
     ) -> Dict[str, Any]:
         start_time = time.perf_counter()
         agent_role = context.get("agent_role", "Assistant")
+        agent_id = context.get("agent_id") or agent_role
         specialist_id = context.get("specialist_id")
         task_title = context.get("task_title", "Task")
         action = context.get("action", "")
+        loop_stage = context.get("loop_stage", "")
 
-        # 1. Coordinator Planning Generation
-        if "Coordinator" in agent_role or action == "formulate_plan":
+        # 1. Coordinator DAG Planning Generation
+        if action == "formulate_plan":
             plan = [
                 {
                     "step_number": 1,
@@ -68,43 +106,86 @@ class DeterministicMockProvider(ModelProvider):
                     }
                 }
             ]
-            content = json.dumps({"thought": f"Analyzed objective '{task_title}'. Decomposed into 3 specialized steps.", "plan": plan}, indent=2)
+            parsed = {
+                "thought": f"Analyzed objective '{task_title}'. Decomposed into 3 specialized DAG steps.",
+                "plan": plan
+            }
+            content = json.dumps(parsed, indent=2)
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return {
                 "content": content,
-                "parsed_json": {"thought": f"Analyzed objective '{task_title}'. Decomposed into 3 specialized steps.", "plan": plan},
+                "parsed_json": parsed,
                 "provider": "mock",
                 "model": self.model_name,
                 "classification": "mock",
-                "usage": {"prompt_tokens": len(system_prompt.split()) + len(user_prompt.split()), "completion_tokens": len(content.split()), "total_tokens": len(system_prompt.split()) + len(user_prompt.split()) + len(content.split())},
+                "usage": {
+                    "prompt_tokens": len(system_prompt.split()) + len(user_prompt.split()),
+                    "completion_tokens": len(content.split()),
+                    "total_tokens": len(system_prompt.split()) + len(user_prompt.split()) + len(content.split())
+                },
                 "latency_ms": elapsed_ms,
                 "raw": {"status": "success", "plan_steps": len(plan)}
             }
 
-        # 2. General Specialist Execution Generation
-        findings = {
-            "role": agent_role,
-            "specialist": specialist_id or "core",
-            "summary": f"Completed execution for '{task_title}' according to {agent_role} procedures.",
-            "metrics": {
-                "confidence_score": 0.98,
-                "validation_status": "verified"
-            }
-        }
-        content = json.dumps({
-            "thought": f"Specialist [{specialist_id or 'core'}] executed analysis under {agent_role}.",
-            "status": "success",
-            "findings": findings
-        }, indent=2)
+        # 2. 5-Stage Agent Execution Loop (Think -> Act -> Observe -> Deterministic Check)
+        target_agent = specialist_id or agent_id
+        output_schema = context.get("output_schema", {})
+        authorized_caps = context.get("authorized_capabilities", [])
+        selected_cap = authorized_caps[0] if authorized_caps else "cap:reporting_compile"
 
+        schema_props = output_schema.get("properties", {}) if isinstance(output_schema, dict) else {}
+        structured_deliverable: Dict[str, Any] = {}
+        for prop_name, prop_spec in schema_props.items():
+            structured_deliverable[prop_name] = self._synthesize_value_for_prop(
+                prop_name,
+                prop_spec if isinstance(prop_spec, dict) else {"type": "string"},
+                str(target_agent),
+                task_title
+            )
+
+        if not structured_deliverable:
+            structured_deliverable = {
+                "summary": f"Completed '{task_title}' via {target_agent}.",
+                "status": "verified"
+            }
+
+        parsed_loop = {
+            "thought": (
+                f"[{target_agent}] Evaluated policy constraints, loaded 3-file context "
+                f"({context.get('active_skill', '/' + str(target_agent))}), and selected capability '{selected_cap}' "
+                f"to fulfill objective: {user_prompt[:120]}"
+            ),
+            "selected_capability": selected_cap,
+            "tool_action": context.get("requested_tool_action", "execute_capability"),
+            "tool_parameters": context.get("step_parameters", {}),
+            "deliverable": structured_deliverable,
+            "findings": {
+                "role": agent_role,
+                "agent_id": target_agent,
+                "specialist": specialist_id or "core",
+                "summary": f"Completed execution for '{task_title}' according to {target_agent} skill procedure.",
+                "metrics": {
+                    "confidence_score": 0.98,
+                    "validation_status": "verified"
+                }
+            },
+            "ready_to_finalize": True,
+            "status": "success"
+        }
+
+        content = json.dumps(parsed_loop, indent=2)
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         return {
             "content": content,
-            "parsed_json": json.loads(content),
+            "parsed_json": parsed_loop,
             "provider": "mock",
             "model": self.model_name,
             "classification": "mock",
-            "usage": {"prompt_tokens": len(system_prompt.split()) + len(user_prompt.split()), "completion_tokens": len(content.split()), "total_tokens": len(system_prompt.split()) + len(user_prompt.split()) + len(content.split())},
+            "usage": {
+                "prompt_tokens": len(system_prompt.split()) + len(user_prompt.split()),
+                "completion_tokens": len(content.split()),
+                "total_tokens": len(system_prompt.split()) + len(user_prompt.split()) + len(content.split())
+            },
             "latency_ms": elapsed_ms,
-            "raw": {"status": "success"}
+            "raw": {"status": "success", "loop_stage": loop_stage or "think"}
         }

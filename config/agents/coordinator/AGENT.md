@@ -121,6 +121,14 @@ Every time this agent is invoked, the OS execution runtime must enforce this exa
 8. **Report completion and unresolved issues:** Provide structured deliverables with evidence.
 9. **Process owner feedback according to the memory rules:** Save durable lessons to `MEMORY.md`.
 
+### Enforced 5-Stage Sovereign Agent Execution Loop (`core/agent_loop.py`)
+Every step assigned to this agent executes through the mandatory 5-stage runtime loop:
+1. **RUN POLICY:** Load `AGENT.md`, `MEMORY.md`, and `SKILL.md`; verify capability permissions; enforce owner approval gates; redact secrets and apply privacy routing rules (`local_only` / `sensitive` / `standard`).
+2. **THINK:** Formulate a structured execution plan and capability selection via the central `ModelManager` using prior loop observations.
+3. **ACT:** Execute authorized capabilities and tools through OS runtime adapters (`FileSystemAdapter`, `TerminalAdapter`, `PlaywrightAdapter`, `VerificationAdapter`, `CapabilityRuntimeEngine`).
+4. **OBSERVE:** Capture concrete tool outputs, exit codes, artifacts, and metrics into the immutable loop trajectory.
+5. **DETERMINISTIC CODE CHECK:** Validate output JSON schema against `SKILL.md`, run Python `ast.parse` syntax checks on generated code, scan for leaked secrets or unapproved `TODO`/`NotImplementedError` stubs, and verify `returncode == 0`.
+
 ---
 
 ## I. Delegation & Collaboration Protocols

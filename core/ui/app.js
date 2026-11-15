@@ -81,7 +81,8 @@ window.refreshActiveTab = function() {
 async function loadTasks(silent = false) {
     try {
         const res = await fetch('/api/tasks');
-        const tasks = await res.json();
+        const raw = await res.json();
+        const tasks = Array.isArray(raw) ? raw : (raw.tasks || []);
         const container = document.getElementById('taskListContainer');
         document.getElementById('taskCountBadge').textContent = `${tasks.length} tasks`;
 
@@ -260,27 +261,32 @@ window.handleCreateTask = async function(e) {
 async function loadAgents() {
     try {
         const res = await fetch('/api/agents');
-        const agents = await res.json();
+        const raw = await res.json();
+        const agents = Array.isArray(raw) ? raw : (raw.agents || []);
         const container = document.getElementById('agentGridContainer');
-        container.innerHTML = agents.map(a => `
+        container.innerHTML = agents.map(a => {
+            const specialists = Array.isArray(a.specialists) ? a.specialists : [];
+            const defaultModel = typeof a.default_model === 'object' && a.default_model !== null ? (a.default_model.name || 'default') : (a.default_model || 'default');
+            return `
             <div class="agent-card">
                 <div>
-                    <span class="agent-dept">${a.department}</span>
-                    <h3 class="agent-card-title">${a.name}</h3>
+                    <span class="agent-dept">${a.department || 'General'}</span>
+                    <h3 class="agent-card-title">${a.name || a.id}</h3>
                 </div>
-                <p>${a.description}</p>
+                <p>${a.description || ''}</p>
                 <div class="specialist-list">
-                    <strong>Specialists (${a.specialists.length}):</strong>
-                    ${a.specialists.map(s => `
-                        <div class="specialist-item">• <strong>${s.name}</strong>: ${s.specialization}</div>
+                    <strong>Specialists (${specialists.length}):</strong>
+                    ${specialists.map(s => `
+                        <div class="specialist-item">• <strong>${s.name || s.id}</strong>: ${s.specialization || ''}</div>
                     `).join('')}
                 </div>
                 <div class="task-meta">
-                    <span>Model: <code>${a.default_model.name}</code></span>
-                    <span>Version: ${a.version}</span>
+                    <span>Model: <code>${defaultModel}</code></span>
+                    <span>Version: ${a.version || '1.0.0'}</span>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (e) {
         console.error('Failed loading agents:', e);
     }
@@ -314,7 +320,8 @@ window.switchSecuritySubTab = function(subTab) {
 async function loadSecurityAccounts(silent = false) {
     try {
         const res = await fetch('/api/security/accounts');
-        cachedAccounts = await res.json();
+        const raw = await res.json();
+        cachedAccounts = Array.isArray(raw) ? raw : (raw.accounts || []);
         renderAccountsGrid(cachedAccounts);
     } catch (e) {
         console.error('Failed loading security accounts:', e);

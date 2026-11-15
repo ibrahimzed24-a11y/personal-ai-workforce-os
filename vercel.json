@@ -1,9 +1,17 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.py"
+      "source": "/api/:path*",
+      "destination": "/api/index.py?__path=:path*"
+    },
+    {
+      "source": "/ping",
+      "destination": "/api/index.py?__path=ping"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index.py?__path=health"
     }
   ],
   "headers": [
@@ -32,7 +40,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co; img-src 'self' data: https:;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.vercel.app; img-src 'self' data: https:;"
         }
       ]
     }

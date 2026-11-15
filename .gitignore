@@ -54,6 +54,8 @@ tmp/
 backups/*.zip
 backups/*.tar.gz
 backups/*.bak
+*.zip
+incoming/
 
 # Supabase Local Cache & Temp
 supabase/.temp/

@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -7,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
-from core.database import init_db
+from core.database import init_db, get_db_connection
 from core.models import TaskCreate, TaskResponse
 from core.orchestrator import Orchestrator
 from core.requirements import RequirementsManager
@@ -21,6 +22,7 @@ orchestrator = Orchestrator()
 requirements_mgr = RequirementsManager()
 integrator_engine = SystemIntegratorEngine()
 creds_mgr = CredentialsManager()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,21 +39,25 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down AI Workforce OS.")
 
+
 app = FastAPI(
     title="AI Workforce OS",
-    description="Private Autonomous AI Development Operating System with Centralized Credentials Vault",
-    version="1.0.0",
+    description="Private Autonomous AI Development Operating System with Centralized Credentials Vault & 5-Stage Agent Loop",
+    version="2.0.0",
     lifespan=lifespan
 )
+
 
 # --- Tasks API ---
 @app.get("/api/tasks")
 async def list_tasks():
     return await orchestrator.list_tasks()
 
+
 @app.post("/api/tasks")
 async def create_task(task_in: TaskCreate):
     return await orchestrator.create_task(task_in)
+
 
 @app.get("/api/tasks/{task_id}")
 async def get_task(task_id: str):
@@ -59,6 +65,7 @@ async def get_task(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
 
 @app.post("/api/tasks/{task_id}/run")
 async def run_task(task_id: str):
@@ -68,14 +75,88 @@ async def run_task(task_id: str):
         logger.error(f"Error running task {task_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/tasks/{task_id}/events")
 async def get_task_events(task_id: str):
     return await orchestrator.get_task_events(task_id)
+
+
+# --- 5-Stage Agent Loop API (Run Policy -> Think -> Act -> Observe -> Deterministic Code Check) ---
+class AgentLoopRunRequest(BaseModel):
+    title: str = "Direct Agent Loop Execution"
+    description: str
+    action_type: str = "execute"
+    parameters: Dict[str, Any] = {}
+    privacy_level: str = "standard"
+    max_iterations: int = 2
+
+
+@app.post("/api/agents/{agent_id}/run-loop")
+async def run_agent_loop_endpoint(agent_id: str, req: AgentLoopRunRequest):
+    try:
+        task_stub = {
+            "id": None,
+            "title": req.title,
+            "description": req.description,
+            "assigned_agent_id": agent_id,
+            "priority": "medium",
+            "input_context": {"privacy_level": req.privacy_level}
+        }
+        step_stub = {
+            "id": "step_direct_1",
+            "step_number": 1,
+            "title": req.title,
+            "description": req.description,
+            "assigned_agent": agent_id,
+            "specialist_id": None,
+            "action_type": req.action_type,
+            "parameters": req.parameters,
+            "privacy_level": req.privacy_level
+        }
+        return await orchestrator.loop_engine.execute_agent_loop(
+            task=task_stub,
+            step=step_stub,
+            max_iterations=req.max_iterations
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except Exception as e:
+        logger.error(f"Error in agent loop for {agent_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/loops")
+async def list_agent_loops(limit: int = 50, agent_id: Optional[str] = None):
+    query = "SELECT * FROM agent_loop_traces WHERE 1=1"
+    params: List[Any] = []
+    if agent_id:
+        query += " AND agent_id = ?"
+        params.append(agent_id)
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    async with get_db_connection() as db:
+        async with db.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            results = []
+            for r in rows:
+                d = dict(r)
+                for json_col in ("policy_check", "think_traces", "act_records", "observations", "deterministic_check", "final_output"):
+                    if d.get(json_col):
+                        try:
+                            d[json_col] = json.loads(d[json_col])
+                        except Exception:
+                            pass
+                results.append(d)
+            return results
+
 
 # --- Agents & Blueprints API ---
 @app.get("/api/agents")
 async def list_agents():
     return await orchestrator.get_all_blueprints()
+
 
 # --- Standardized Three-File Architecture API ---
 class MemoryFeedbackRequest(BaseModel):
@@ -83,16 +164,19 @@ class MemoryFeedbackRequest(BaseModel):
     author: str = "owner"
     auto_apply: bool = True
 
+
 class SlashInvokeRequest(BaseModel):
     command: str
     task_id: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
+
 
 @app.get("/api/agents/three-file-catalog")
 async def get_three_file_catalog():
     from core.agent_context import AgentContextLoader
     loader = AgentContextLoader()
     return loader.list_all_agents()
+
 
 @app.get("/api/agents/{agent_id}/context")
 async def get_agent_runtime_context(agent_id: str):
@@ -102,6 +186,7 @@ async def get_agent_runtime_context(agent_id: str):
         return loader.build_runtime_context(agent_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
 
 @app.post("/api/agents/{agent_id}/memory/feedback")
 async def submit_memory_feedback(agent_id: str, req: MemoryFeedbackRequest):
@@ -122,6 +207,7 @@ async def submit_memory_feedback(agent_id: str, req: MemoryFeedbackRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/skills/invoke-slash")
 async def invoke_slash_command(req: SlashInvokeRequest):
     from core.agent_context import AgentContextLoader
@@ -129,8 +215,7 @@ async def invoke_slash_command(req: SlashInvokeRequest):
     resolved = loader.resolve_slash_command(req.command)
     if not resolved:
         raise HTTPException(status_code=404, detail=f"Slash command '{req.command}' not found")
-    
-    # Load agent context
+
     ctx = loader.build_runtime_context(resolved["agent_id"], req.parameters or {})
     return {
         "status": "success",
@@ -139,6 +224,7 @@ async def invoke_slash_command(req: SlashInvokeRequest):
         "startup_checklist": ctx["startup_checklist"],
         "context_summary": f"Loaded AGENT.md, MEMORY.md, and {resolved['slash_command']} for {resolved['agent_id']}"
     }
+
 
 # --- Post-Implementation Verification & Evidence Audit API ---
 class VerificationAuditRequest(BaseModel):
@@ -149,6 +235,7 @@ class VerificationAuditRequest(BaseModel):
     initiated_by: str = "user"
     test_commands: Optional[List[str]] = None
 
+
 @app.post("/api/verification/audit")
 async def run_verification_audit(req: VerificationAuditRequest):
     from core.verification.engine import PostImplementationVerificationEngine
@@ -158,7 +245,7 @@ async def run_verification_audit(req: VerificationAuditRequest):
         profile_enum = VerificationProfile(req.profile.lower())
     except Exception:
         profile_enum = VerificationProfile.STANDARD
-        
+
     try:
         return await engine.run_audit(
             target_component=req.target_component,
@@ -172,6 +259,7 @@ async def run_verification_audit(req: VerificationAuditRequest):
         logger.error(f"Error executing verification audit: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/verification/audits")
 async def list_verification_audits(
     limit: int = 50,
@@ -183,6 +271,7 @@ async def list_verification_audits(
     engine = PostImplementationVerificationEngine()
     return await engine.list_audits(limit=limit, status=status, profile=profile, target_component=target)
 
+
 @app.get("/api/verification/audits/{audit_id}")
 async def get_verification_audit_detail(audit_id: str):
     from core.verification.engine import PostImplementationVerificationEngine
@@ -191,6 +280,7 @@ async def get_verification_audit_detail(audit_id: str):
     if not audit:
         raise HTTPException(status_code=404, detail="Audit record not found")
     return audit
+
 
 @app.get("/api/verification/profiles")
 async def get_verification_profiles():
@@ -223,19 +313,23 @@ async def get_verification_profiles():
         ]
     }
 
+
 # --- Requirements & Change Management API ---
 class RequirementCreate(BaseModel):
     category: str
     title: str
     specification: Dict[str, Any]
 
+
 @app.get("/api/requirements")
 async def list_requirements():
     return await requirements_mgr.list_requirements()
 
+
 @app.post("/api/requirements")
 async def submit_requirement(req_in: RequirementCreate):
     return await requirements_mgr.submit_requirement(req_in.category, req_in.title, req_in.specification)
+
 
 @app.post("/api/requirements/{req_id}/apply")
 async def apply_requirement(req_id: str):
@@ -244,18 +338,22 @@ async def apply_requirement(req_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # --- System Integrator & Update Agent API ---
 @app.get("/api/integrator/scan")
 async def scan_incoming():
     return await integrator_engine.scan_incoming()
 
+
 @app.get("/api/integrator/assets")
 async def list_assets():
     return await integrator_engine.list_assets()
 
+
 @app.post("/api/integrator/approve/{asset_id}")
 async def approve_asset(asset_id: str):
     return await integrator_engine.approve_asset(asset_id)
+
 
 @app.post("/api/integrator/install/{asset_id}")
 async def install_asset(asset_id: str):
@@ -264,12 +362,14 @@ async def install_asset(asset_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/integrator/rollback/{asset_id}")
 async def rollback_asset(asset_id: str):
     try:
         return await integrator_engine.rollback_asset(asset_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/integrator/knowledge")
 async def get_operational_knowledge():
@@ -285,6 +385,7 @@ async def get_operational_knowledge():
                     pass
     return knowledge
 
+
 # --- Security: Centralized Credentials & Access API ---
 class AccountCreate(BaseModel):
     name: str
@@ -299,24 +400,29 @@ class AccountCreate(BaseModel):
     notes: str = ""
     assigned_agents: Optional[List[str]] = None
 
+
 class PasswordRevealRequest(BaseModel):
     master_key: str
+
 
 class CredentialAccessRequest(BaseModel):
     agent_id: str
     task_id: str
     project_id: str = "global"
 
+
 class PasswordUpdateRequest(BaseModel):
     new_password: str
     changed_by: str = "owner"
     reason: str = "Routine rotation"
+
 
 class PolicyUpdateRequest(BaseModel):
     account_id: str
     agent_id: str
     permission_level: str
     is_active: bool = True
+
 
 class RegistrationRequestCreate(BaseModel):
     agent_id: str
@@ -328,6 +434,7 @@ class RegistrationRequestCreate(BaseModel):
     proposed_username: str
     is_paid: bool = False
 
+
 @app.get("/api/security/accounts")
 async def list_security_accounts(
     agent_id: Optional[str] = Query(None),
@@ -336,6 +443,7 @@ async def list_security_accounts(
     search: Optional[str] = Query(None)
 ):
     return await creds_mgr.list_accounts(agent_id=agent_id, category=category, project_id=project_id, search=search)
+
 
 @app.post("/api/security/accounts")
 async def create_security_account(acc_in: AccountCreate):
@@ -353,6 +461,7 @@ async def create_security_account(acc_in: AccountCreate):
         assigned_agents=acc_in.assigned_agents
     )
 
+
 @app.get("/api/security/accounts/{account_id}")
 async def get_security_account(account_id: str, agent_id: Optional[str] = Query(None)):
     try:
@@ -363,6 +472,7 @@ async def get_security_account(account_id: str, agent_id: Optional[str] = Query(
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
 
+
 @app.post("/api/security/accounts/{account_id}/reveal")
 async def reveal_account_password(account_id: str, req: PasswordRevealRequest):
     try:
@@ -371,6 +481,7 @@ async def reveal_account_password(account_id: str, req: PasswordRevealRequest):
         raise HTTPException(status_code=401, detail="Invalid master authentication")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.post("/api/security/accounts/{account_id}/request-access")
 async def request_credential_access(account_id: str, req: CredentialAccessRequest):
@@ -386,6 +497,7 @@ async def request_credential_access(account_id: str, req: CredentialAccessReques
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.post("/api/security/accounts/{account_id}/update-password")
 async def update_account_password(account_id: str, req: PasswordUpdateRequest):
     try:
@@ -398,6 +510,7 @@ async def update_account_password(account_id: str, req: PasswordUpdateRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.post("/api/security/policies")
 async def set_agent_policy(req: PolicyUpdateRequest):
     return await creds_mgr.set_agent_policy(
@@ -407,9 +520,11 @@ async def set_agent_policy(req: PolicyUpdateRequest):
         is_active=req.is_active
     )
 
+
 @app.get("/api/security/registrations")
 async def list_registration_requests():
     return await creds_mgr.list_registration_requests()
+
 
 @app.post("/api/security/registrations")
 async def request_account_registration(req: RegistrationRequestCreate):
@@ -424,21 +539,26 @@ async def request_account_registration(req: RegistrationRequestCreate):
         is_paid=req.is_paid
     )
 
+
 @app.post("/api/security/registrations/{req_id}/approve")
 async def approve_registration(req_id: str, decision: str = "APPROVED", notes: str = ""):
     return await creds_mgr.approve_registration(req_id, owner_decision=decision, notes=notes)
+
 
 @app.post("/api/security/sessions/{session_id}/revoke")
 async def revoke_session(session_id: str):
     return await creds_mgr.revoke_session(session_id)
 
+
 @app.get("/api/security/health")
 async def get_credential_health():
     return await creds_mgr.get_credential_health_report()
 
+
 @app.get("/api/security/audit")
 async def get_security_audit_logs(limit: int = 100, account_id: Optional[str] = None, agent_id: Optional[str] = None):
     return await creds_mgr.get_audit_logs(limit=limit, account_id=account_id, agent_id=agent_id)
+
 
 # --- Model Manager API ---
 @app.get("/api/models/status")
@@ -446,10 +566,12 @@ async def get_reasoning_status():
     """Returns honest audit of active reasoning engine, model, and provider status."""
     return await orchestrator.model_manager.get_system_reasoning_status()
 
+
 @app.get("/api/models/providers")
 async def list_model_providers():
     """Lists all configured LLM providers (Ollama, OpenAI, Gemini, Anthropic, Mock)."""
     return await orchestrator.model_manager.list_providers()
+
 
 @app.post("/api/models/providers/{provider_id}/credential")
 async def configure_provider_credential(provider_id: str, payload: Dict[str, Any]):
@@ -459,15 +581,18 @@ async def configure_provider_credential(provider_id: str, payload: Dict[str, Any
         raise HTTPException(status_code=400, detail="API key is required.")
     return await orchestrator.model_manager.update_provider_credential(provider_id, api_key)
 
+
 @app.post("/api/models/providers/{provider_id}/health")
 async def check_provider_health(provider_id: str):
     """Executes live reachability and auth check on provider."""
     return await orchestrator.model_manager.check_provider_health(provider_id)
 
+
 @app.get("/api/models")
 async def list_models(active_only: bool = False):
     """Lists all registered models with capability tags and performance metrics."""
     return await orchestrator.model_manager.list_models(active_only=active_only)
+
 
 @app.post("/api/models/default")
 async def set_default_model(payload: Dict[str, Any]):
@@ -476,6 +601,16 @@ async def set_default_model(payload: Dict[str, Any]):
     if not model_id:
         raise HTTPException(status_code=400, detail="model_id is required.")
     return await orchestrator.model_manager.set_default_model(model_id)
+
+
+@app.get("/api/models/routing")
+async def list_routing_rules():
+    """Lists all LLM routing rules."""
+    async with get_db_connection() as db:
+        async with db.execute("SELECT * FROM llm_routing_rules ORDER BY priority DESC") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
 
 @app.get("/api/models/metrics")
 async def get_model_metrics(limit: int = 50):
@@ -494,17 +629,20 @@ async def get_model_metrics(limit: int = 50):
             rows = await cursor.fetchall()
             return [dict(r) for r in rows]
 
+
 # --- System Health API ---
 @app.get("/api/health")
 async def health_check():
     return {
         "status": "healthy",
         "system": "AI Workforce OS",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "database": "SQLite WAL",
         "vault": "AES-128-CBC Fernet (0600 POSIX)",
+        "agent_loop": "5-Stage Enforced (Run Policy -> Think -> Act -> Observe -> Deterministic Code Check)",
         "runtime": "Python 3.12 (uv)"
     }
+
 
 # --- Web UI Static Files ---
 UI_DIR = Path(__file__).resolve().parent / "ui"
