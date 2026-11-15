@@ -49,6 +49,12 @@ class TaskSubmitRequest(BaseModel):
 
 # --- Cloud API Endpoints ---
 
+@app.get("/ping")
+@app.get("/api/ping")
+def ping():
+    return {"ping": "pong", "runtime": "vercel-serverless"}
+
+@app.get("/health")
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint for Vercel serverless runtime."""
@@ -185,11 +191,14 @@ if UI_DIR.exists():
         if index_file.exists():
             return FileResponse(str(index_file))
         return JSONResponse({"message": "AI Workforce OS Vercel API Active"})
-else:
-    @app.get("/")
-    async def serve_fallback():
-        return JSONResponse({
-            "name": "AI Workforce OS Cloud Gateway",
-            "status": "online",
-            "runtime": "vercel-serverless"
-        })
+
+@app.api_route("/{full_path:path}", methods=["GET", "POST"])
+async def catch_all(full_path: str, request: Request):
+    return {
+        "status": "online",
+        "runtime": "vercel-serverless",
+        "requested_path": full_path,
+        "request_url": str(request.url),
+        "headers": dict(request.headers),
+        "message": "AI Workforce OS Serverless Gateway"
+    }

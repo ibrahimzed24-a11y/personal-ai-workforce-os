@@ -64,3 +64,5 @@ backups/*.bak
 ehthumbs.db
 Thumbs.db
 backups/
+.vercel
+.env*
