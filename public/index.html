@@ -2,31 +2,55 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Workforce OS — Control Center</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Mobile Top Header Bar -->
+    <header class="mobile-header">
+        <div class="mobile-header-left">
+            <button class="hamburger-btn" id="mobileMenuToggle" aria-label="Toggle navigation drawer">☰</button>
+            <div class="mobile-brand-title">
+                <span class="logo-mark" style="width:28px; height:28px; font-size:15px;">⚡</span>
+                <span>AI Workforce OS</span>
+            </div>
+        </div>
+        <div class="mobile-actions">
+            <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()" title="Refresh tab data">⟳</button>
+            <button class="btn btn-primary btn-sm" onclick="window.openNewTaskModal()">+ Task</button>
+        </div>
+    </header>
+
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="window.closeMobileSidebar()"></div>
+
     <div class="app-layout">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
+        <!-- Sidebar Navigation Drawer -->
+        <aside class="sidebar" id="appSidebar">
             <div class="brand">
                 <div class="logo-mark">⚡</div>
                 <div class="brand-text">
                     <h1>AI Workforce OS</h1>
-                    <span class="badge online">Local Workstation</span>
+                    <span class="badge online"><span class="beacon-pulse"></span> Cloud-Local Hybrid</span>
                 </div>
             </div>
             
             <nav class="nav-menu">
                 <button class="nav-item active" data-tab="tasks">
-                    <span class="icon">📋</span> Tasks & Execution
+                    <span class="icon">📋</span> Tasks & Queue
                 </button>
                 <button class="nav-item" data-tab="agents">
-                    <span class="icon">🤖</span> Agent Blueprints
+                    <span class="icon">🤖</span> 32 Agent Workforce
+                </button>
+                <button class="nav-item" data-tab="workflows">
+                    <span class="icon">⚡</span> Workflow & DAG
                 </button>
                 <button class="nav-item" data-tab="security">
-                    <span class="icon">🔒</span> Security & Credentials
+                    <span class="icon">🔒</span> Sovereign Vault
                 </button>
                 <button class="nav-item" data-tab="models">
                     <span class="icon">🧠</span> LLM & Models
@@ -35,159 +59,423 @@
                     <span class="icon">🔄</span> System Integrator
                 </button>
                 <button class="nav-item" data-tab="requirements">
-                    <span class="icon">⚙️</span> Requirements Engine
+                    <span class="icon">⚙️</span> Requirements
                 </button>
                 <button class="nav-item" data-tab="events">
-                    <span class="icon">📜</span> System Event Log
+                    <span class="icon">📜</span> Event Audit Trail
                 </button>
             </nav>
 
             <div class="system-status-widget">
+                <div class="status-widget-header">
+                    <span>Hardware Runtime</span>
+                    <span class="beacon-pulse" title="Live Heartbeat Active"></span>
+                </div>
                 <div class="status-row">
-                    <span class="label">Host:</span>
-                    <span class="val">Intel x86_64</span>
+                    <span class="label">Worker Node:</span>
+                    <span class="val" id="widgetNodeName">macbook-pro</span>
                 </div>
                 <div class="status-row">
                     <span class="label">Database:</span>
-                    <span class="val">SQLite (WAL)</span>
+                    <span class="val">Supabase PG + WAL</span>
                 </div>
                 <div class="status-row">
-                    <span class="label">Vault:</span>
-                    <span class="val">AES-128-CBC (0600)</span>
+                    <span class="label">Vault Isolation:</span>
+                    <span class="val">POSIX 0600</span>
                 </div>
                 <div class="status-row">
-                    <span class="label">Engine:</span>
-                    <span class="val">Python 3.12 (uv)</span>
+                    <span class="label">Loop Engine:</span>
+                    <span class="val">5-Stage Enforced</span>
                 </div>
             </div>
         </aside>
 
         <!-- Main Content View -->
         <main class="main-content">
-            <!-- Header -->
+            <!-- Desktop Topbar -->
             <header class="topbar">
-                <div class="breadcrumb" id="currentTabTitle">Tasks & Execution</div>
+                <div class="topbar-title-group">
+                    <div class="breadcrumb" id="currentTabTitle">Tasks & Queue</div>
+                    <span class="topbar-subtitle" id="currentTabSubtitle">Real-time autonomous multi-agent task execution and queue inspector</span>
+                </div>
                 <div class="actions">
                     <button class="btn btn-secondary" onclick="window.refreshActiveTab()">⟳ Refresh</button>
                     <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewTaskModal()">+ Create Task</button>
                 </div>
             </header>
 
-            <!-- Tab 1: Tasks -->
-            <section id="tasksTab" class="tab-pane active">
-                <div class="split-view">
-                    <!-- Task List -->
-                    <div class="panel list-panel">
-                        <div class="panel-header">
-                            <h2>Task Queue</h2>
-                            <span class="task-count" id="taskCountBadge">0 tasks</span>
+            <!-- Executive KPI Metrics Bar -->
+            <section class="kpi-bar" id="kpiExecutiveBar">
+                <div class="kpi-card">
+                    <div class="kpi-icon">📋</div>
+                    <div class="kpi-content">
+                        <div class="kpi-label">Hybrid Tasks</div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value" id="kpiTotalTasks">0</span>
+                            <span class="kpi-meta" id="kpiCompletedTasks">0 Completed</span>
                         </div>
-                        <div class="task-list" id="taskListContainer">
-                            <div class="empty-state">No tasks created yet. Click "+ Create Task" to begin.</div>
+                        <div class="kpi-progress">
+                            <div class="kpi-progress-bar" id="kpiTaskProgress" style="width: 0%;"></div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Task Detail & Live Execution Viewer -->
-                    <div class="panel detail-panel">
-                        <div class="panel-header">
-                            <h2>Execution Inspector</h2>
-                            <div id="taskStatusBadges"></div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background:var(--bg-subtle); color:var(--text-primary);">🤖</div>
+                    <div class="kpi-content">
+                        <div class="kpi-label">Workforce OS</div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value">32</span>
+                            <span class="kpi-meta">Agents (8 Core + 24 Spec)</span>
                         </div>
-                        <div class="detail-content" id="taskDetailContainer">
-                            <div class="empty-state">Select a task from the queue to view its execution plan and live progress.</div>
+                        <div class="kpi-progress">
+                            <div class="kpi-progress-bar" style="width: 100%; background: linear-gradient(135deg, #059669, #10b981);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background:var(--success-bg); color:var(--success);">💻</div>
+                    <div class="kpi-content">
+                        <div class="kpi-label">Local Execution Node</div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value" style="font-size:15px; color:var(--success);" id="kpiNodeStatus">ONLINE</span>
+                            <span class="kpi-meta">MacBook Pro Primary</span>
+                        </div>
+                        <div class="kpi-progress">
+                            <div class="kpi-progress-bar" style="width: 100%; background: var(--success);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background:var(--indigo-bg); color:var(--indigo);">🧠</div>
+                    <div class="kpi-content">
+                        <div class="kpi-label">Inference Engine</div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value" style="font-size:14px; color:var(--indigo);" id="kpiModelStatus">Gemini 2.5 Flash</span>
+                            <span class="kpi-meta">Multi-Tier</span>
+                        </div>
+                        <div class="kpi-progress">
+                            <div class="kpi-progress-bar" style="width: 100%; background: var(--indigo);"></div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Tab 2: Agents & Specialists -->
-            <section id="agentsTab" class="tab-pane">
-                <div class="panel full-panel">
-                    <div class="panel-header">
-                        <h2>Configurable Agent Organization</h2>
-                        <span class="tag">8 Core Agents Registered</span>
+            <!-- ==============================================================
+                 Tab 1: Tasks & Execution Queue
+                 ============================================================== -->
+            <section id="tasksTab" class="tab-pane active">
+                <div class="split-view">
+                    <!-- Task List Panel -->
+                    <div class="panel list-panel" id="taskListPanel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Autonomous Task Queue</h2>
+                                <span class="subtext">Cloud-queued tasks leased and executed by local Mac worker</span>
+                            </div>
+                            <span class="task-count badge online" id="taskCountBadge">0 tasks</span>
+                        </div>
+                        <div class="task-list" id="taskListContainer">
+                            <div class="empty-state">Loading hybrid task queue...</div>
+                        </div>
                     </div>
+
+                    <!-- Task Detail & Live Execution Viewer Panel -->
+                    <div class="panel detail-panel" id="taskDetailPanel">
+                        <button class="mobile-back-btn" id="mobileBackToTasksBtn" onclick="window.showTaskListOnMobile()">
+                            ← Back to Task Queue
+                        </button>
+                        <div class="panel-header">
+                            <div>
+                                <h2>Execution Inspector</h2>
+                                <span class="subtext">5-Stage Agent Loop execution telemetry and deliverable audit</span>
+                            </div>
+                            <div id="taskStatusBadges"></div>
+                        </div>
+                        <div class="detail-content" id="taskDetailContainer">
+                            <div class="empty-state">Select a task from the queue to view its execution plan, 5-stage loop traces, and deliverable.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==============================================================
+                 Tab 2: 32 Agent Workforce Blueprints
+                 ============================================================== -->
+            <section id="agentsTab" class="tab-pane">
+                <div class="panel full-panel" style="padding:16px;">
+                    <div class="panel-header" style="border:none; padding:0 0 16px 0;">
+                        <div>
+                            <h2>Universal 32-Agent Organization</h2>
+                            <p class="subtext">Every agent operates with sovereign <code>AGENT.md</code>, <code>SKILL.md</code>, and <code>MEMORY.md</code> files.</p>
+                        </div>
+                        <span class="tag status-completed">32 Agents Active (8 Core + 24 Specialists)</span>
+                    </div>
+
+                    <!-- Search & Filter Controls -->
+                    <div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap;">
+                        <input type="text" id="agentSearchInput" class="input-field" placeholder="Search agents by role, department, specialist, or skill..." style="max-width:380px;" oninput="window.filterAgents()">
+                    </div>
+
+                    <div class="filter-pills-bar" id="agentDepartmentPills">
+                        <button class="pill-filter active" onclick="window.filterAgentsByDept('all')">All (32)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Operations & Orchestration')">Operations (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Engineering & Architecture')">Engineering (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Browser Automation')">Browser (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Market & Research')">Market & SEO (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Growth & Marketing')">Marketing (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Release & Operations')">Deployment (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('Executive Governance')">Reporting (4)</button>
+                        <button class="pill-filter" onclick="window.filterAgentsByDept('System Evolution')">Integrator (4)</button>
+                    </div>
+
                     <div class="agent-grid" id="agentGridContainer">
                         <!-- Loaded dynamically -->
                     </div>
                 </div>
             </section>
 
-            <!-- Tab 3: Security & Credentials Vault -->
+            <!-- ==============================================================
+                 Tab 3: Interactive Workflow & DAG Visualizer (NEW)
+                 ============================================================== -->
+            <section id="workflowsTab" class="tab-pane">
+                <div class="workflow-container">
+                    <div class="panel-header" style="border:none; padding:0 0 16px 0;">
+                        <div>
+                            <h2>Interactive Orchestration & DAG Visualizer</h2>
+                            <p class="subtext">Trace how high-level goals transform into multi-agent DAG execution plans and verified deliverables.</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="window.simulateDagRun()">▶ Simulate DAG Pipeline</button>
+                    </div>
+
+                    <!-- Visual Flowchart DAG -->
+                    <div class="dag-flowchart" id="dagFlowchart">
+                        <!-- Stage 1: Objective & Input -->
+                        <div class="dag-row">
+                            <div class="dag-node" id="dagNodeGoal">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon">🎯</div>
+                                    <div>
+                                        <div class="dag-node-title">Owner Goal & Inputs</div>
+                                        <span class="tag priority-high">High Priority</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    High-level objective received with security constraints, privacy tier, and operational parameters.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Input Protocol</span>
+                                    <code>JSON / Web UI</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dag-connector-arrow">↓</div>
+
+                        <!-- Stage 2: Coordinator & Task Decomposer -->
+                        <div class="dag-row">
+                            <div class="dag-node" id="dagNodeCoord">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon">🧭</div>
+                                    <div>
+                                        <div class="dag-node-title">Coordinator Agent</div>
+                                        <span class="tag">/coordinator-agent</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Decomposes objective into directed acyclic graph (DAG) execution steps with explicit prerequisites.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Specialist</span>
+                                    <strong>Task Decomposer</strong>
+                                </div>
+                            </div>
+
+                            <div class="dag-node" id="dagNodeAlloc">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon">⚖️</div>
+                                    <div>
+                                        <div class="dag-node-title">Resource Allocator</div>
+                                        <span class="tag">/resource-allocation</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Maps DAG steps to the optimal agent blueprints and capability budgets across routing tiers.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Routing Rule</span>
+                                    <strong>Multi-Tier LLM</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dag-connector-arrow">↓</div>
+
+                        <!-- Stage 3: Universal 5-Stage Agent Execution Loop Engine -->
+                        <div class="dag-row">
+                            <div class="dag-node" id="dagNodeLoop" style="border-color:var(--accent); min-width:320px;">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon" style="background:var(--blue-gradient); color:#ffffff;">⚡</div>
+                                    <div>
+                                        <div class="dag-node-title">Universal 5-Stage Agent Loop Engine</div>
+                                        <span class="tag status-running">Enforced Runtime</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    <code>1. Run Policy</code> ➔ <code>2. Think</code> ➔ <code>3. Act</code> ➔ <code>4. Observe</code> ➔ <code>5. Deterministic Code Check</code>
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Security Guarantee</span>
+                                    <strong>0 Secrets Stored in Cloud</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dag-connector-arrow">↓</div>
+
+                        <!-- Stage 4: Autonomous Specialist Execution Matrix -->
+                        <div class="dag-row">
+                            <div class="dag-node" id="dagNodeSoftware">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon">💻</div>
+                                    <div>
+                                        <div class="dag-node-title">Software Engineer</div>
+                                        <span class="tag">/software-engineering</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Implements backend logic, API endpoints, and runs AST syntax validation.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Runtime</span>
+                                    <code>FileSystem / Local Mac</code>
+                                </div>
+                            </div>
+
+                            <div class="dag-node" id="dagNodeBrowser">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon">🌐</div>
+                                    <div>
+                                        <div class="dag-node-title">Browser Use Agent</div>
+                                        <span class="tag">/browser-automation</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Navigates DOM portals, extracts structured data, captures verification screenshots.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Runtime</span>
+                                    <code>Playwright / Chromium</code>
+                                </div>
+                            </div>
+
+                            <div class="dag-node" id="dagNodeResearch">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon">📊</div>
+                                    <div>
+                                        <div class="dag-node-title">Market & SEO Analyst</div>
+                                        <span class="tag">/market-seo-geo-research</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Audits crawlability, benchmark competitors, and scores regional GEO intent.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Runtime</span>
+                                    <code>Data Extraction</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dag-connector-arrow">↓</div>
+
+                        <!-- Stage 5: Independent Verification & Synthesis -->
+                        <div class="dag-row">
+                            <div class="dag-node" id="dagNodeVerifier">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon" style="color:var(--success); background:var(--success-bg);">🔬</div>
+                                    <div>
+                                        <div class="dag-node-title">Independent Verifier</div>
+                                        <span class="tag status-completed">Passed 6/6 Checks</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Performs deterministic schema compliance, zero-stub assertion, and exit code validation.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Quality Seal</span>
+                                    <strong>Certified Zero Stubs</strong>
+                                </div>
+                            </div>
+
+                            <div class="dag-node" id="dagNodeReport">
+                                <div class="dag-node-header">
+                                    <div class="dag-node-icon" style="color:var(--indigo); background:var(--indigo-bg);">📑</div>
+                                    <div>
+                                        <div class="dag-node-title">Master Reporting Agent</div>
+                                        <span class="tag">/master-reporting</span>
+                                    </div>
+                                </div>
+                                <div class="dag-node-body">
+                                    Synthesizes multi-agent traces into final verified executive deliverable markdown.
+                                </div>
+                                <div class="dag-node-footer">
+                                    <span>Output</span>
+                                    <strong>Owner Deliverable</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==============================================================
+                 Tab 4: Sovereign Credentials Vault
+                 ============================================================== -->
             <section id="securityTab" class="tab-pane">
-                <div class="panel full-panel" style="display:flex; flex-direction:column; gap:16px;">
-                    <!-- Health Stats -->
+                <div class="panel full-panel" style="padding:16px; display:flex; flex-direction:column; gap:16px;">
+                    <!-- Health Stats Row -->
                     <div class="stats-row" id="securityStatsRow">
                         <div class="stat-box">
-                            <span class="stat-num" id="statTotalAccounts">0</span>
-                            <span class="stat-label">Total Accounts</span>
+                            <span class="stat-num" id="statTotalAccounts">3</span>
+                            <span class="stat-label">Registered Accounts</span>
                         </div>
                         <div class="stat-box">
-                            <span class="stat-num" id="statMfaDisabled" style="color:var(--warning);">0</span>
-                            <span class="stat-label">MFA Disabled</span>
+                            <span class="stat-num" style="color:var(--success);">0</span>
+                            <span class="stat-label">Cloud Secret Leaks</span>
                         </div>
                         <div class="stat-box">
-                            <span class="stat-num" id="statStalePass" style="color:var(--accent);">0</span>
-                            <span class="stat-label">Stale Passwords (>90d)</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-num" id="statVaultStatus" style="font-size:13px; color:var(--success);">ACTIVE</span>
+                            <span class="stat-num" style="color:var(--accent);">POSIX 0600</span>
                             <span class="stat-label">Vault Storage</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-num" id="statVaultStatus" style="color:var(--success);">SECURE</span>
+                            <span class="stat-label">Vault Health</span>
                         </div>
                     </div>
 
-                    <!-- Sub Navigation -->
-                    <div class="sub-nav-bar">
-                        <div class="tabs-sub">
-                            <button class="btn-sub active" id="secSubBtnAccounts" onclick="window.switchSecuritySubTab('accounts')">Accounts Inventory</button>
-                            <button class="btn-sub" id="secSubBtnRegistrations" onclick="window.switchSecuritySubTab('registrations')">Account Requests</button>
-                            <button class="btn-sub" id="secSubBtnMonitoring" onclick="window.switchSecuritySubTab('monitoring')">Security Monitoring</button>
-                            <button class="btn-sub" id="secSubBtnAudit" onclick="window.switchSecuritySubTab('audit')">Audit History</button>
+                    <!-- Sub Navigation Bar -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <div class="filter-pills-bar" style="padding:0;">
+                            <button class="pill-filter active" id="secSubBtnAccounts" onclick="window.switchSecuritySubTab('accounts')">Accounts Inventory</button>
+                            <button class="pill-filter" id="secSubBtnMonitoring" onclick="window.switchSecuritySubTab('monitoring')">Security Monitoring</button>
+                            <button class="pill-filter" id="secSubBtnAudit" onclick="window.switchSecuritySubTab('audit')">Audit History</button>
                         </div>
                         <button class="btn btn-primary" onclick="window.openNewAccountModal()">+ Add Account</button>
                     </div>
 
                     <!-- Subtab 1: Accounts Inventory -->
                     <div id="secSubAccounts" class="sec-sub-pane">
-                        <div class="filter-bar">
-                            <input type="text" id="secSearchInput" class="input-field" placeholder="Search accounts, URLs, usernames..." oninput="window.filterAccounts()">
-                            <select id="secCategoryFilter" class="input-field" onchange="window.filterAccounts()">
-                                <option value="">All Categories</option>
-                                <option value="ai_tools">AI Tools & Platforms</option>
-                                <option value="research_seo">Research & SEO</option>
-                                <option value="marketing">Marketing Platforms</option>
-                                <option value="social_media">Social Media</option>
-                                <option value="hosting_domains">Hosting & Domains</option>
-                                <option value="development">Development Platforms</option>
-                                <option value="cloud_infra">Cloud Infrastructure</option>
-                                <option value="analytics">Analytics</option>
-                                <option value="communication">Communication</option>
-                                <option value="business_apps">Business Applications</option>
-                                <option value="personal">Personal Accounts</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
                         <div class="accounts-grid" id="accountsGridContainer">
                             <!-- Loaded dynamically -->
                         </div>
                     </div>
 
-                    <!-- Subtab 2: Registrations -->
-                    <div id="secSubRegistrations" class="sec-sub-pane" style="display:none;">
-                        <div class="panel-header">
-                            <div>
-                                <h3>Agent Account Registration Requests</h3>
-                                <p class="subtext">Owner approval required before creating new external subscriptions or services.</p>
-                            </div>
-                        </div>
-                        <div class="req-list" id="registrationsListContainer">
-                            <!-- Loaded dynamically -->
-                        </div>
-                    </div>
-
-                    <!-- Subtab 3: Security Monitoring -->
+                    <!-- Subtab 2: Security Monitoring -->
                     <div id="secSubMonitoring" class="sec-sub-pane" style="display:none;">
-                        <div class="panel-header">
+                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
                             <h3>Credential Health & Posture Analysis</h3>
                         </div>
                         <div id="securityRecommendationsContainer">
@@ -195,9 +483,9 @@
                         </div>
                     </div>
 
-                    <!-- Subtab 4: Audit History -->
+                    <!-- Subtab 3: Audit History -->
                     <div id="secSubAudit" class="sec-sub-pane" style="display:none;">
-                        <div class="panel-header">
+                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
                             <h3>Credential Access Audit Trail</h3>
                             <span class="subtext">Append-only security log</span>
                         </div>
@@ -208,9 +496,61 @@
                 </div>
             </section>
 
-            <!-- Tab 4: System Integrator & Update Agent -->
+            <!-- ==============================================================
+                 Tab 5: LLM & Models Inference Catalog
+                 ============================================================== -->
+            <section id="modelsTab" class="tab-pane">
+                <div class="panel full-panel" style="padding:16px; display:flex; flex-direction:column; gap:20px;">
+                    <!-- Reasoning Status Banner -->
+                    <div class="kpi-card" style="border-left:4px solid var(--accent);">
+                        <div class="kpi-icon">🧠</div>
+                        <div class="kpi-content">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">
+                                        Reasoning Engine: <span id="reasoningStatusBadge" class="badge online">Active Hybrid Routing</span>
+                                    </h3>
+                                    <p style="font-size:12.5px; color:var(--text-muted); margin:0;" id="reasoningNoticeText">
+                                        Multi-tier intelligent routing: Ollama (Local Sovereign) ➔ Gemini / Claude (Cloud) ➔ Deterministic Fallback.
+                                    </p>
+                                </div>
+                                <div>
+                                    <span style="font-size:12px; color:var(--text-muted);">Active Default Model:</span>
+                                    <strong style="color:var(--accent); font-size:14px; margin-left:6px;" id="activeModelLabel">gemini-2.5-flash</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inference Providers -->
+                    <div>
+                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
+                            <h2>Inference Providers</h2>
+                            <span class="subtext">Local inference daemons and cloud model APIs</span>
+                        </div>
+                        <div class="agent-grid" id="providerGridContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Registered Models Catalog -->
+                    <div>
+                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
+                            <h2>Registered Models Catalog</h2>
+                            <span class="subtext">Models available for task routing and capability execution</span>
+                        </div>
+                        <div class="agent-grid" id="modelsGridContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==============================================================
+                 Tab 6: System Integrator
+                 ============================================================== -->
             <section id="integratorTab" class="tab-pane">
-                <div class="integrator-grid">
+                <div class="split-view">
                     <!-- Left: Incoming Assets Scanner -->
                     <div class="panel">
                         <div class="panel-header">
@@ -218,9 +558,9 @@
                                 <h2>Incoming Capabilities Queue</h2>
                                 <p class="subtext">Source directory: <code>~/AI-Workforce/incoming/</code></p>
                             </div>
-                            <button class="btn btn-primary" onclick="window.scanIncomingAssets()">🔍 Scan Incoming</button>
+                            <button class="btn btn-primary btn-sm" onclick="window.scanIncomingAssets()">🔍 Scan Incoming</button>
                         </div>
-                        <div class="asset-list" id="incomingAssetsContainer">
+                        <div class="asset-list" id="incomingAssetsContainer" style="padding:16px;">
                             <div class="empty-state">No incoming assets currently waiting. Click "Scan Incoming" to check.</div>
                         </div>
                     </div>
@@ -230,14 +570,14 @@
                         <div class="panel-header">
                             <h2>Operational Knowledge & Active Registry</h2>
                         </div>
-                        <div class="knowledge-viewer" id="knowledgeViewerContainer">
-                            <div class="tabs-sub">
-                                <button class="btn-sub active" onclick="window.showKnowledgeDoc('INSTALLED_ASSETS.md')">Installed Assets</button>
-                                <button class="btn-sub" onclick="window.showKnowledgeDoc('AVAILABLE_CAPABILITIES.md')">Capabilities</button>
-                                <button class="btn-sub" onclick="window.showKnowledgeDoc('SKILLS_INDEX.md')">Skills Index</button>
-                                <button class="btn-sub" onclick="window.showKnowledgeDoc('AGENT_TOOL_ACCESS.json')">Agent Tool Access</button>
+                        <div class="knowledge-viewer" id="knowledgeViewerContainer" style="padding:16px;">
+                            <div class="filter-pills-bar" style="margin-bottom:12px;">
+                                <button class="pill-filter active" onclick="window.showKnowledgeDoc('INSTALLED_ASSETS.md')">Installed Assets</button>
+                                <button class="pill-filter" onclick="window.showKnowledgeDoc('AVAILABLE_CAPABILITIES.md')">Capabilities</button>
+                                <button class="pill-filter" onclick="window.showKnowledgeDoc('SKILLS_INDEX.md')">Skills Index</button>
+                                <button class="pill-filter" onclick="window.showKnowledgeDoc('AGENT_TOOL_ACCESS.json')">Agent Tool Access</button>
                             </div>
-                            <div class="doc-content" id="docContentArea">
+                            <div class="doc-content" id="docContentArea" style="background:var(--bg-subtle); padding:16px; border-radius:var(--radius-md); font-family:var(--font-mono); font-size:12px; max-height:400px; overflow-y:auto;">
                                 <pre>Loading operational knowledge...</pre>
                             </div>
                         </div>
@@ -245,11 +585,13 @@
                 </div>
             </section>
 
-            <!-- Tab 5: Requirements Engine -->
+            <!-- ==============================================================
+                 Tab 7: Requirements Engine
+                 ============================================================== -->
             <section id="requirementsTab" class="tab-pane">
                 <div class="split-view">
-                    <div class="panel">
-                        <div class="panel-header">
+                    <div class="panel" style="padding:20px;">
+                        <div class="panel-header" style="border:none; padding:0 0 16px 0;">
                             <h2>Submit System Requirement</h2>
                         </div>
                         <form id="requirementForm" onsubmit="window.submitRequirement(event)">
@@ -269,14 +611,14 @@
                             </div>
                             <div class="form-group">
                                 <label>Specification (JSON)</label>
-                                <textarea id="reqSpec" class="input-field code-textarea" rows="8">{\n  "name": "Data Analyst Agent",\n  "department": "Analytics & Intelligence",\n  "role": "Quantitative Analyst",\n  "capabilities": ["sql_querying", "data_visualization"]\n}</textarea>
+                                <textarea id="reqSpec" class="input-field" rows="6" style="font-family:var(--font-mono); font-size:12px;">{\n  "name": "Data Analyst Agent",\n  "department": "Analytics & Intelligence",\n  "role": "Quantitative Analyst",\n  "capabilities": ["sql_querying", "data_visualization"]\n}</textarea>
                             </div>
                             <button type="submit" class="btn btn-primary">Evaluate & Propose Change Plan</button>
                         </form>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-header">
+                    <div class="panel" style="padding:20px;">
+                        <div class="panel-header" style="border:none; padding:0 0 16px 0;">
                             <h2>Requirements & Change History</h2>
                         </div>
                         <div class="requirements-list" id="requirementsListContainer">
@@ -286,86 +628,48 @@
                 </div>
             </section>
 
-            <!-- Tab 6: Event Stream -->
+            <!-- ==============================================================
+                 Tab 8: System Execution Event Log
+                 ============================================================== -->
             <section id="eventsTab" class="tab-pane">
-                <div class="panel full-panel">
-                    <div class="panel-header">
-                        <h2>System Execution Audit Log</h2>
-                        <span class="subtext">Real-time immutable audit trail from <code>execution_events</code></span>
-                    </div>
-                    <div class="event-stream" id="globalEventStreamContainer">
-                        <!-- Loaded dynamically -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- Tab 7: LLM & Models Management -->
-            <section id="modelsTab" class="tab-pane">
-                <div class="panel full-panel" style="display:flex; flex-direction:column; gap:20px;">
-                    <!-- Reasoning Status Banner -->
-                    <div class="panel" style="background:var(--bg-card); border-left:4px solid var(--accent); padding:16px;" id="reasoningStatusBanner">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <h3 style="margin:0 0 6px 0; font-size:16px;">Reasoning Engine Status: <span id="reasoningStatusBadge" class="badge">Loading...</span></h3>
-                                <p style="margin:0; font-size:13px; color:var(--text-muted);" id="reasoningNoticeText">Checking provider status...</p>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-size:12px; color:var(--text-muted);">Active Default Model:</div>
-                                <div style="font-size:14px; font-weight:600; color:var(--accent);" id="activeModelLabel">mock-deterministic-v1</div>
-                            </div>
+                <div class="panel full-panel" style="padding:20px;">
+                    <div class="panel-header" style="border:none; padding:0 0 16px 0;">
+                        <div>
+                            <h2>System Execution Audit Log</h2>
+                            <p class="subtext">Real-time immutable audit trail from <code>execution_events</code></p>
                         </div>
                     </div>
-
-                    <!-- Configured Providers -->
-                    <div>
-                        <div class="panel-header" style="margin-bottom:12px;">
-                            <h2 style="font-size:15px;">Inference Providers</h2>
-                            <span class="subtext">Local inference daemons and cloud model APIs</span>
-                        </div>
-                        <div class="agent-grid" id="providerGridContainer" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-                            <!-- Loaded dynamically -->
-                        </div>
-                    </div>
-
-                    <!-- Registered Models Catalog -->
-                    <div>
-                        <div class="panel-header" style="margin-bottom:12px;">
-                            <h2 style="font-size:15px;">Registered Models Catalog</h2>
-                            <span class="subtext">Models available for task routing and execution</span>
-                        </div>
-                        <div class="agent-grid" id="modelsGridContainer" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-                            <!-- Loaded dynamically -->
-                        </div>
-                    </div>
-
-                    <!-- Recent LLM Invocation Metrics -->
-                    <div>
-                        <div class="panel-header" style="margin-bottom:12px;">
-                            <h2 style="font-size:15px;">Recent Invocation Metrics</h2>
-                            <span class="subtext">Token usage and latency log from <code>llm_usage_metrics</code></span>
-                        </div>
-                        <div style="background:var(--bg-card); border-radius:8px; overflow:hidden; border:1px solid var(--border);">
-                            <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
-                                <thead>
-                                    <tr style="background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border);">
-                                        <th style="padding:10px 14px;">Timestamp</th>
-                                        <th style="padding:10px 14px;">Agent / Task</th>
-                                        <th style="padding:10px 14px;">Model Used</th>
-                                        <th style="padding:10px 14px;">Tokens (P / C / Tot)</th>
-                                        <th style="padding:10px 14px;">Latency</th>
-                                        <th style="padding:10px 14px;">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="llmMetricsTableBody">
-                                    <tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">No invocation metrics recorded yet.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="event-stream" id="globalEventStreamContainer" style="display:flex; flex-direction:column; gap:8px;">
+                        <div class="empty-state">Loading system events...</div>
                     </div>
                 </div>
             </section>
         </main>
     </div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav">
+        <button class="mobile-nav-item active" data-tab="tasks">
+            <span class="icon">📋</span>
+            <span>Tasks</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="agents">
+            <span class="icon">🤖</span>
+            <span>Agents</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="workflows">
+            <span class="icon">⚡</span>
+            <span>Workflow</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="security">
+            <span class="icon">🔒</span>
+            <span>Vault</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="models">
+            <span class="icon">🧠</span>
+            <span>Models</span>
+        </button>
+    </nav>
 
     <!-- Create Task Modal -->
     <div id="newTaskModal" class="modal-overlay">
@@ -380,33 +684,33 @@
                     <input type="text" id="taskTitleInput" class="input-field" placeholder="e.g. Conduct SEO audit and software architecture review" required>
                 </div>
                 <div class="form-group">
-                    <label>Description & Objectives</label>
-                    <textarea id="taskDescInput" class="input-field" rows="4" placeholder="Describe the business requirements, expectations, and deliverables..." required></textarea>
+                    <label>Assigned Core Agent</label>
+                    <select id="taskAgentInput" class="input-field">
+                        <option value="coordinator">Coordinator Agent (Operations & Orchestration)</option>
+                        <option value="software-engineer">Software Engineer Agent (Engineering & Architecture)</option>
+                        <option value="browser-use-agent">Browser Use Agent (Browser Automation)</option>
+                        <option value="market-seo-geo-researcher">Market, SEO & GEO Researcher</option>
+                        <option value="marketing-agent">Marketing Agent (Growth & Strategy)</option>
+                        <option value="deployment-agent">Deployment Agent (Release & Operations)</option>
+                        <option value="master-reporting-agent">Master Reporting Agent (Governance)</option>
+                        <option value="system-integrator-update-agent">System Integrator & Update Agent</option>
+                    </select>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Priority</label>
-                        <select id="taskPriorityInput" class="input-field">
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                            <option value="low">Low</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Target Agent</label>
-                        <select id="taskAgentInput" class="input-field">
-                            <option value="coordinator">Coordinator Agent (Autonomous Planning)</option>
-                            <option value="market-seo-geo-researcher">Market, SEO & GEO Researcher</option>
-                            <option value="software-engineer">Software Engineer Agent</option>
-                            <option value="browser-use-agent">Browser Use Agent (Playwright)</option>
-                            <option value="system-integrator-update-agent">System Integrator & Update Agent</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label>Priority</label>
+                    <select id="taskPriorityInput" class="input-field">
+                        <option value="high">High Priority</option>
+                        <option value="medium" selected>Medium Priority</option>
+                        <option value="low">Low Priority</option>
+                    </select>
                 </div>
-                <div class="modal-actions">
+                <div class="form-group">
+                    <label>Instructions & Goal Details</label>
+                    <textarea id="taskDescInput" class="input-field" rows="4" placeholder="Describe the goal, required deliverables, and constraints..." required></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button type="button" class="btn btn-secondary" onclick="window.closeNewTaskModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Task</button>
+                    <button type="submit" class="btn btn-primary">Dispatch Task</button>
                 </div>
             </form>
         </div>
@@ -416,117 +720,42 @@
     <div id="newAccountModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Register Account in Secure Vault</h3>
+                <h3>Add Vault Account</h3>
                 <button class="close-btn" onclick="window.closeNewAccountModal()">✕</button>
             </div>
             <form onsubmit="window.handleCreateAccount(event)">
                 <div class="form-group">
-                    <label>Service / Application Name</label>
-                    <input type="text" id="accNameInput" class="input-field" placeholder="e.g. Semrush, GitHub, OpenAI, Cloudflare" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select id="accCategoryInput" class="input-field">
-                            <option value="research_seo">Research & SEO</option>
-                            <option value="ai_tools">AI Tools & Platforms</option>
-                            <option value="development">Development Platforms</option>
-                            <option value="marketing">Marketing Platforms</option>
-                            <option value="social_media">Social Media</option>
-                            <option value="hosting_domains">Hosting & Domains</option>
-                            <option value="cloud_infra">Cloud Infrastructure</option>
-                            <option value="analytics">Analytics</option>
-                            <option value="communication">Communication</option>
-                            <option value="business_apps">Business Applications</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>MFA Status</label>
-                        <select id="accMfaInput" class="input-field">
-                            <option value="DISABLED">Disabled</option>
-                            <option value="TOTP">Authenticator App (TOTP)</option>
-                            <option value="SMS">SMS Verification</option>
-                            <option value="EMAIL">Email Verification</option>
-                            <option value="SECURITY_KEY">Hardware Security Key</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Website URL</label>
-                        <input type="url" id="accUrlInput" class="input-field" placeholder="https://example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Login URL</label>
-                        <input type="url" id="accLoginUrlInput" class="input-field" placeholder="https://example.com/login" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Username / Email</label>
-                        <input type="text" id="accUserInput" class="input-field" placeholder="user@company.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Password (Encrypted in Vault)</label>
-                        <input type="password" id="accPassInput" class="input-field" placeholder="••••••••••••" required>
-                    </div>
+                    <label>Account / Service Name</label>
+                    <input type="text" id="accNameInput" class="input-field" placeholder="e.g. Cloudflare DNS Production" required>
                 </div>
                 <div class="form-group">
-                    <label>Authorized Agents (Hold 'authenticate' & 'use' permissions)</label>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:12px;">
-                        <label><input type="checkbox" name="authAgentCheck" value="market-seo-geo-researcher"> Market & SEO Researcher</label>
-                        <label><input type="checkbox" name="authAgentCheck" value="browser-use-agent" checked> Browser Use Agent</label>
-                        <label><input type="checkbox" name="authAgentCheck" value="software-engineer"> Software Engineer</label>
-                        <label><input type="checkbox" name="authAgentCheck" value="coordinator"> Coordinator Agent</label>
-                    </div>
+                    <label>Category</label>
+                    <select id="accCategoryInput" class="input-field">
+                        <option value="cloud_infra">Cloud Infrastructure</option>
+                        <option value="ai_tools">AI Tools & Platforms</option>
+                        <option value="development">Development Platforms</option>
+                        <option value="hosting_domains">Hosting & Domains</option>
+                        <option value="research_seo">Research & SEO</option>
+                        <option value="marketing">Marketing Platforms</option>
+                    </select>
                 </div>
-                <div class="modal-actions">
+                <div class="form-group">
+                    <label>Username / Email</label>
+                    <input type="text" id="accUsernameInput" class="input-field" placeholder="e.g. admin@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Service URL</label>
+                    <input type="url" id="accUrlInput" class="input-field" placeholder="https://..." required>
+                </div>
+                <div class="form-group">
+                    <label>Password (Encrypted with local Fernet Vault)</label>
+                    <input type="password" id="accPasswordInput" class="input-field" placeholder="Enter password..." required>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button type="button" class="btn btn-secondary" onclick="window.closeNewAccountModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save to Encrypted Vault</button>
+                    <button type="submit" class="btn btn-primary">Encrypt & Store</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Configure Provider API Key Modal -->
-    <div id="configureApiKeyModal" class="modal-overlay">
-        <div class="modal" style="width:500px;">
-            <div class="modal-header">
-                <h3 id="modalProviderTitle">Configure API Key</h3>
-                <button class="close-btn" onclick="window.closeApiKeyModal()">✕</button>
-            </div>
-            <form onsubmit="window.handleSaveApiKey(event)">
-                <input type="hidden" id="selectedProviderId">
-                <div class="form-group">
-                    <label>Provider Name</label>
-                    <input type="text" id="modalProviderName" class="input-field" disabled>
-                </div>
-                <div class="form-group">
-                    <label>API Key (Encrypted in Vault with AES-128-CBC)</label>
-                    <input type="password" id="modalProviderApiKey" class="input-field" placeholder="sk-..." required>
-                    <small style="color:var(--text-muted); font-size:11px; margin-top:4px; display:block;">
-                        The key is securely encrypted using your local master key. It will never be stored in plain text or exposed.
-                    </small>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="window.closeApiKeyModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Encrypt & Save to Vault</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Account Detail Modal -->
-    <div id="accountDetailModal" class="modal-overlay">
-        <div class="modal" style="width:620px;">
-            <div class="modal-header">
-                <h3 id="detailAccName">Account Details</h3>
-                <button class="close-btn" onclick="window.closeAccountDetailModal()">✕</button>
-            </div>
-            <div id="accountDetailBody">
-                <!-- Dynamically loaded -->
-            </div>
         </div>
     </div>
 
