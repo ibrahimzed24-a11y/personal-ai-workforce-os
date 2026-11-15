@@ -97,10 +97,23 @@ def encrypt_secret(plain: str) -> str:
 def decrypt_secret(cipher_text: str) -> str:
     if not cipher_text:
         return ""
+    # Try primary cipher first
     try:
         return get_cipher().decrypt(cipher_text.encode("utf-8")).decode("utf-8")
     except Exception:
-        return cipher_text
+        pass
+
+    # Try known fallback ciphers (e.g. dev secret or alternate vault secret)
+    fallbacks = ["default-dev-vault-key-change-in-prod", "8c96ba96f8054e21c25876cf31af517c"]
+    for fb in fallbacks:
+        try:
+            d = hashlib.sha256(fb.encode("utf-8")).digest()
+            f = Fernet(base64.urlsafe_b64encode(d))
+            return f.decrypt(cipher_text.encode("utf-8")).decode("utf-8")
+        except Exception:
+            continue
+
+    return cipher_text
 
 
 # --- LLM Providers & Models Catalog ---
@@ -997,7 +1010,7 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
         project = proj_res.json()[0]
 
         vault_res = await client.get(
-            f"{SUPABASE_URL}/rest/v1/credential_vault?select=tool_name,login_url,allowed_actions&project_id=eq.{payload.project_id}&is_enabled=eq.true",
+            f"{SUPABASE_URL}/rest/v1/credential_vault?select=tool_name,login_url,username_identifier,encrypted_secret,allowed_actions&project_id=eq.{payload.project_id}&is_enabled=eq.true",
             headers=sb_headers(token),
         )
         tools = vault_res.json() if vault_res.status_code == 200 else []
