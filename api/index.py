@@ -286,7 +286,22 @@ async def get_task_events(task_id: str):
 
 @app.get("/api/agents")
 async def list_cloud_agents():
-    """List all 32 agent blueprints registered in the OS."""
+    """List all 32 agent blueprints and specialists registered in the OS."""
+    agents_dir = ROOT_DIR / "config" / "agents"
+    if agents_dir.exists():
+        import yaml
+        blueprints = []
+        for yf in sorted(agents_dir.glob("*.yaml")):
+            try:
+                with open(yf, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                    if data and isinstance(data, dict):
+                        blueprints.append(data)
+            except Exception as e:
+                logger.warning(f"Error reading {yf}: {e}")
+        if blueprints:
+            return blueprints
+
     if supabase.is_configured():
         try:
             import httpx
@@ -308,13 +323,7 @@ async def list_cloud_agents():
         except Exception as e:
             logger.warning(f"Failed to query agents from Supabase: {e}")
 
-    # Fallback to local catalog
-    try:
-        from core.agent_context import AgentContextLoader
-        loader = AgentContextLoader()
-        return loader.list_all_agents()
-    except Exception:
-        return []
+    return []
 
 # --- Security & Vault Safe Cloud Endpoints (No plaintext secrets exposed) ---
 @app.get("/api/security/accounts")
