@@ -16,3 +16,5 @@ pytest>=8.3.0
 # Document & Spreadsheet Harness Parsers (PDF, CSV, XLSX)
 openpyxl>=3.1.5
 pypdf>=5.0.0
+reportlab>=4.2.0
+python-docx>=1.1.0

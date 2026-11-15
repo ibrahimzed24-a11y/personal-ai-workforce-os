@@ -1,6 +1,7 @@
 import os
 import sys
 import io
+import re
 import csv
 import base64
 import hashlib
@@ -14,7 +15,7 @@ import httpx
 from cryptography.fernet import Fernet
 from fastapi import FastAPI, Depends, HTTPException, Header, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
@@ -924,8 +925,9 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
     token = user["_access_token"]
     is_ar = detect_arabic(payload.message)
     lang = "ar" if is_ar else "en"
+    msg_raw = payload.message.strip()
 
-    async with httpx.AsyncClient(timeout=25.0) as client:
+    async with httpx.AsyncClient(timeout=35.0) as client:
         # 1. Load isolated project, its vault tools & core data documents
         proj_res = await client.get(
             f"{SUPABASE_URL}/rest/v1/projects?id=eq.{payload.project_id}&limit=1",
@@ -947,7 +949,23 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
         )
         documents = doc_res.json() if doc_res.status_code == 200 else []
 
-        # 2. Save Operator Chat Message
+        from core.orchestrator import PipelineHandoverOrchestrator
+        orchestrator = PipelineHandoverOrchestrator(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+        # 2. Check for Admin Slash Commands (/ask, /direct, /add-agent, /assign)
+        if msg_raw.startswith("/"):
+            cmd_result = await orchestrator.handle_slash_command(
+                raw_message=msg_raw,
+                project=project,
+                user=user,
+                token=token,
+                documents=documents,
+                tools=tools
+            )
+            if cmd_result:
+                return {"reply": cmd_result, "run": None}
+
+        # 3. Save Operator Chat Message
         await client.post(
             f"{SUPABASE_URL}/rest/v1/project_messages",
             headers=sb_headers(token),
@@ -956,85 +974,121 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
                 "project_id": payload.project_id,
                 "sender_role": "operator",
                 "sender_name": user.get("email", "Admin"),
-                "content": payload.message.strip(),
+                "content": msg_raw,
                 "language": lang,
             },
         )
 
-        # 3. Execute Sequential Agent Handoff Pipeline
+        # 4. Check for Direct 1-on-1 Agent Chat (@agent-name <prompt>)
+        direct_match = re.match(r"^@([a-zA-Z0-9_\-]+)\s+(.*)$", msg_raw, re.DOTALL)
+        if direct_match:
+            target_agent = direct_match.group(1).lower()
+            sub_directive = direct_match.group(2).strip()
+            pipeline_res = await orchestrator.execute_sequential_pipeline(
+                project=project,
+                directive=sub_directive,
+                agents=[target_agent],
+                user=user,
+                token=token,
+                documents=documents,
+                tools=tools
+            )
+            return {
+                "reply": {
+                    "sender_role": "agent",
+                    "sender_name": target_agent,
+                    "content": pipeline_res["final_report"],
+                    "artifacts": pipeline_res.get("exported_artifacts", [])
+                },
+                "run": pipeline_res
+            }
+
+        # 5. Full Sequential Multi-Agent Pipeline Execution & Terminal Synthesis
         agents = project.get("assigned_agents") or ["coordinator", "browser-researcher", "report-compiler"]
-        tool_summary = ", ".join([t["tool_name"] for t in tools]) if tools else "None"
-        doc_count = len(documents)
-        data_summary = f"{doc_count} core data files loaded ({', '.join(d['file_name'] for d in documents[:3])})" if doc_count else "No files attached"
-
-        if payload.local_worker_output:
-            final_reply = payload.local_worker_output
-            runtime_used = f"Local LLM ({project.get('llm_model', 'qwen2.5-coder:7b')})"
-        else:
-            coord_res = await generate_bilingual_coordinator_reply(project, tools, documents, payload.message.strip(), is_ar)
-            final_reply = coord_res["content"]
-            runtime_used = coord_res["runtime_used"]
-
-        now_iso = datetime.now(timezone.utc).isoformat()
-        handoff_steps = [
-            {
-                "step": 1,
-                "agent": agents[0] if len(agents) > 0 else "coordinator",
-                "action": f"Verified project scope & checked core data harness ({data_summary})",
-                "status": "completed",
-                "timestamp": now_iso,
-            },
-            {
-                "step": 2,
-                "agent": agents[1] if len(agents) > 1 else "specialist",
-                "action": f"Parsed harness records & checked authorized tools ({tool_summary})",
-                "status": "completed",
-                "timestamp": now_iso,
-            },
-            {
-                "step": 3,
-                "agent": agents[-1] if len(agents) > 2 else "report-compiler",
-                "action": f"Compiled plain-language Admin Report grounded in core files via {runtime_used}",
-                "status": "completed",
-                "timestamp": now_iso,
-            },
-        ]
-
-        latency_ms = int((time.perf_counter() - started) * 1000)
-
-        run_res = await client.post(
-            f"{SUPABASE_URL}/rest/v1/pipeline_runs",
-            headers=sb_headers(token),
-            json={
-                "user_id": user["id"],
-                "project_id": payload.project_id,
-                "directive": payload.message.strip(),
-                "runtime_used": runtime_used,
-                "status": "completed",
-                "handoff_steps": handoff_steps,
-                "admin_report": final_reply,
-                "latency_ms": latency_ms,
-            },
-        )
-
-        # 4. Save Coordinator Reply to Chat
-        reply_res = await client.post(
-            f"{SUPABASE_URL}/rest/v1/project_messages",
-            headers=sb_headers(token),
-            json={
-                "user_id": user["id"],
-                "project_id": payload.project_id,
-                "sender_role": "coordinator",
-                "sender_name": f"Coordinator ({project.get('llm_model', 'Default')})",
-                "content": final_reply,
-                "language": lang,
-            },
+        pipeline_res = await orchestrator.execute_sequential_pipeline(
+            project=project,
+            directive=msg_raw,
+            agents=agents,
+            user=user,
+            token=token,
+            documents=documents,
+            tools=tools
         )
 
         return {
-            "reply": reply_res.json()[0] if reply_res.status_code < 400 else None,
-            "run": run_res.json()[0] if run_res.status_code < 400 else None,
+            "reply": {
+                "sender_role": "coordinator",
+                "sender_name": f"Master Reporting Agent ({project.get('llm_model', 'Default')})",
+                "content": pipeline_res["final_report"],
+                "artifacts": pipeline_res.get("exported_artifacts", [])
+            },
+            "run": pipeline_res
         }
+
+
+# --- Project Reports & Handovers Inspection Endpoints ---
+@app.get("/api/projects/{project_id}/reports")
+async def list_project_reports(project_id: str, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    token = user["_access_token"]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_reports?project_id=eq.{project_id}&order=created_at.desc",
+            headers=sb_headers(token),
+        )
+    reports = res.json() if res.status_code == 200 else []
+    return {"reports": reports}
+
+
+@app.get("/api/projects/{project_id}/reports/{report_id}/download")
+async def download_project_report(project_id: str, report_id: str, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    token = user["_access_token"]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_reports?id=eq.{report_id}&limit=1",
+            headers=sb_headers(token),
+        )
+    rep = res.json()[0] if (res.status_code == 200 and res.json()) else None
+    if not rep or not rep.get("local_path"):
+        proj_res = await client.get(f"{SUPABASE_URL}/rest/v1/projects?id=eq.{project_id}&limit=1", headers=sb_headers(token))
+        slug = proj_res.json()[0].get("slug", "project") if proj_res.status_code == 200 and proj_res.json() else "project"
+        matches = list((ROOT_DIR / "projects" / slug).glob(f"**/*{report_id}*"))
+        if matches and matches[0].is_file():
+            local_path = matches[0]
+            fmt = local_path.suffix.lstrip(".")
+        else:
+            raise HTTPException(status_code=404, detail="Report deliverable not found.")
+    else:
+        local_path = ROOT_DIR / rep["local_path"]
+        fmt = rep.get("file_format", "pdf").lower()
+
+    if not local_path.exists():
+        raise HTTPException(status_code=404, detail="Report file not found on disk.")
+
+    media_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "csv": "text/csv",
+        "json": "application/json",
+        "md": "text/markdown",
+        "svg": "image/svg+xml",
+        "png": "image/png",
+        "zip": "application/zip",
+    }
+    mtype = media_types.get(fmt, "application/octet-stream")
+    return FileResponse(path=str(local_path), media_type=mtype, filename=local_path.name)
+
+
+@app.get("/api/projects/{project_id}/handovers")
+async def list_project_handovers(project_id: str, task_id: Optional[str] = None, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    token = user["_access_token"]
+    query = f"{SUPABASE_URL}/rest/v1/pipeline_handovers?project_id=eq.{project_id}&order=step_number.asc,created_at.desc"
+    if task_id:
+        query += f"&task_id=eq.{task_id}"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(query, headers=sb_headers(token))
+    handovers = res.json() if res.status_code == 200 else []
+    return {"handovers": handovers}
 
 
 # --- Connectors Integration ---
@@ -1143,38 +1197,118 @@ async def test_connector(connector_id: str):
     }
 
 
-# --- 32-Agent Workforce Catalog ---
+# --- 32-Agent Workforce & Permanent Skills Catalog ---
+try:
+    from core.agent_context import AgentContextLoader
+    agent_loader = AgentContextLoader()
+except Exception:
+    agent_loader = None
+
 @app.get("/api/agents")
 async def list_agents():
+    if agent_loader:
+        try:
+            agents = agent_loader.list_all_agents()
+            return {
+                "count": len(agents),
+                "departments": [
+                    "Operations & Orchestration",
+                    "Research & Market Strategy",
+                    "Growth & Communications",
+                    "Engineering & Technology",
+                    "Automation & Data Acquisition",
+                    "Infrastructure & Operations",
+                    "Executive & Audit",
+                    "System Architecture & Integration"
+                ],
+                "agents": agents
+            }
+        except Exception as e:
+            logger.warning(f"Error loading agents via loader: {e}")
+
+    # Fallback structure
     return {
         "count": 32,
         "departments": [
-            "Operations",
-            "Engineering",
-            "Browser",
-            "Market & SEO",
-            "Marketing",
-            "Deployment",
-            "Reporting",
-            "Integrator"
+            "Operations & Orchestration",
+            "Research & Market Strategy",
+            "Growth & Communications",
+            "Engineering & Technology",
+            "Automation & Data Acquisition",
+            "Infrastructure & Operations",
+            "Executive & Audit",
+            "System Architecture & Integration"
         ],
-        "core_agents": [
-            "core-orchestrator",
-            "browser-automation",
-            "software-engineer",
-            "market-seo-analyst",
-            "marketing-content-creator",
-            "deployment-specialist",
-            "master-reporting",
-            "system-integrator"
-        ]
+        "agents": []
     }
 
 @app.get("/api/agents/{agent_id}/context")
 async def get_agent_context(agent_id: str):
+    if agent_loader:
+        try:
+            ctx = agent_loader.compose_full_context(agent_id)
+            return {
+                "agent_id": agent_id,
+                "agent_md": ctx.get("agent_instructions", ""),
+                "skill_md": ctx.get("active_skill", {}).get("procedure_markdown", ""),
+                "memory_md": ctx.get("agent_memory", ""),
+                "slash_command": ctx.get("active_skill", {}).get("slash_command", f"/{agent_id}"),
+                "harnesses": ["DeepSeek CoT", "Superpowers TDD", "ECC AgentShield", "Addy Osmani", "Browser-Use CDP"]
+            }
+        except Exception as e:
+            logger.warning(f"Error loading agent context for {agent_id}: {e}")
+
     return {
         "agent_id": agent_id,
         "agent_md": f"# {agent_id}\n\nAutonomous agent blueprint with POSIX 0600 sandbox execution.",
         "skill_md": f"# Skills for {agent_id}\n\nDeterministic capabilities and tool bindings.",
         "memory_md": f"# Memory for {agent_id}\n\nPersistent operational learnings and project state."
     }
+
+@app.get("/api/skills")
+async def list_permanent_skills():
+    skills = []
+    if agent_loader:
+        try:
+            skills = agent_loader.discover_permanent_skills()
+        except Exception as e:
+            logger.warning(f"Error discovering permanent skills: {e}")
+    return {
+        "count": len(skills),
+        "categories": sorted(list(set(s["category"] for s in skills))),
+        "skills": skills
+    }
+
+@app.get("/api/events")
+async def list_recent_events(limit: int = 30):
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            r = await client.get(
+                f"{SUPABASE_URL}/rest/v1/execution_events?select=*&order=timestamp.desc&limit={limit}",
+                headers={
+                    "apikey": SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
+                }
+            )
+            if r.status_code == 200:
+                return {"events": r.json()}
+    except Exception as e:
+        logger.warning(f"Error fetching execution events: {e}")
+    return {"events": []}
+
+@app.get("/api/projects/{project_id}/events")
+async def list_project_events(project_id: str, limit: int = 30):
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            r = await client.get(
+                f"{SUPABASE_URL}/rest/v1/execution_events?select=*&order=timestamp.desc&limit={limit}",
+                headers={
+                    "apikey": SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
+                }
+            )
+            if r.status_code == 200:
+                return {"events": r.json()}
+    except Exception as e:
+        logger.warning(f"Error fetching project events: {e}")
+    return {"events": []}

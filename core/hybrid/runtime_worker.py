@@ -216,7 +216,44 @@ async def local_delete_project(project_id: str):
 
 @app.get("/api/projects/{project_id}/workspace")
 async def local_workspace(project_id: str):
-    return {"messages": [], "runs": [], "documents": LOCAL_PROJECT_DOCS.get(project_id, [])}
+    from api.index import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+    messages = []
+    runs = []
+    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                m_res = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/project_messages?project_id=eq.{project_id}&order=created_at.asc",
+                    headers={"apikey": SUPABASE_SERVICE_ROLE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"},
+                )
+                if m_res.status_code == 200:
+                    messages = m_res.json()
+
+                r_res = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/pipeline_runs?project_id=eq.{project_id}&order=created_at.desc",
+                    headers={"apikey": SUPABASE_SERVICE_ROLE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"},
+                )
+                if r_res.status_code == 200:
+                    runs = r_res.json()
+        except Exception:
+            pass
+    return {"messages": messages, "runs": runs, "documents": LOCAL_PROJECT_DOCS.get(project_id, [])}
+
+
+@app.post("/api/chat")
+async def local_chat_endpoint(payload: dict):
+    from api.index import project_chat_and_pipeline, ChatDispatchRequest, SUPABASE_SERVICE_ROLE_KEY
+    chat_req = ChatDispatchRequest(
+        project_id=payload.get("project_id"),
+        message=payload.get("message", ""),
+        local_worker_output=payload.get("local_worker_output")
+    )
+    user = {
+        "id": "3ff7069c-7720-43de-92ca-892170124f62",
+        "email": "ibrahim.zed24@gmail.com",
+        "_access_token": SUPABASE_SERVICE_ROLE_KEY
+    }
+    return await project_chat_and_pipeline(payload=chat_req, user=user)
 
 
 @app.get("/api/projects/{project_id}/vault")
@@ -324,6 +361,81 @@ async def local_agents():
 async def local_agent_context(agent_id: str):
     from api.index import get_agent_context
     return await get_agent_context(agent_id)
+
+@app.get("/api/skills")
+async def local_skills():
+    from api.index import list_permanent_skills
+    return await list_permanent_skills()
+
+@app.get("/api/events")
+async def local_events(limit: int = 30):
+    from api.index import list_recent_events
+    return await list_recent_events(limit)
+
+@app.get("/api/projects/{project_id}/events")
+async def local_project_events(project_id: str, limit: int = 30):
+    from api.index import list_project_events
+    return await list_project_events(project_id, limit)
+
+
+# --- Project Reports & Handovers Endpoints (Local Standalone Bridge) ---
+@app.get("/api/projects/{project_id}/reports")
+async def local_project_reports(project_id: str):
+    from api.index import SUPABASE_URL, SUPABASE_ANON_KEY
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                res = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/project_reports?project_id=eq.{project_id}&order=created_at.desc",
+                    headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
+                )
+                if res.status_code == 200:
+                    return {"reports": res.json()}
+        except Exception:
+            pass
+    return {"reports": []}
+
+
+@app.get("/api/projects/{project_id}/reports/{report_id}/download")
+async def local_download_report(project_id: str, report_id: str):
+    from api.index import download_project_report
+    # Fallback search locally in ./projects/
+    matches = list((PUBLIC_DIR.parent / "projects").glob(f"**/*{report_id}*"))
+    if matches and matches[0].is_file():
+        p = matches[0]
+        fmt = p.suffix.lstrip(".")
+        media_types = {
+            "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "csv": "text/csv",
+            "json": "application/json",
+            "md": "text/markdown",
+            "svg": "image/svg+xml",
+            "zip": "application/zip",
+        }
+        return FileResponse(path=str(p), media_type=media_types.get(fmt, "application/octet-stream"), filename=p.name)
+    raise HTTPException(status_code=404, detail="Report not found.")
+
+
+@app.get("/api/projects/{project_id}/handovers")
+async def local_project_handovers(project_id: str, task_id: Optional[str] = None):
+    from api.index import SUPABASE_URL, SUPABASE_ANON_KEY
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        try:
+            q = f"{SUPABASE_URL}/rest/v1/pipeline_handovers?project_id=eq.{project_id}&order=step_number.asc,created_at.desc"
+            if task_id:
+                q += f"&task_id=eq.{task_id}"
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                res = await client.get(
+                    q,
+                    headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
+                )
+                if res.status_code == 200:
+                    return {"handovers": res.json()}
+        except Exception:
+            pass
+    return {"handovers": []}
 
 
 # --- Static Webapp File Serving ---

@@ -156,3 +156,12 @@ Your operational efficiency is objectively measured by:
 - **Tool-Call Success Rate (TSR):** Ratio of successful tool calls (`exit_code == 0`) to total calls.
 - **Execution Latency:** Wall-clock time consumed per execution step.
 - **Rework Rate (RR):** Frequency of steps rejected by verifiers requiring re-execution.
+
+## M. Sovereign Harnesses & Permanent Skills Authorized
+This agent is authorized to invoke and enforce the following permanent OS harnesses within **Automation & Data Acquisition**:
+- Browser-Use Direct CDP Browser Agent Controller (`/browser-use`)
+- Browser-Use Remote & QA Assertion Engine (`/qa-browser-test`)
+- Superpowers Systematic Debugging Protocol (`/systematic-debugging`)
+- DeepSeek R1/V3 CoT Reflection Prior to Web Action
+- **DeepSeek CoT Protocol:** Enter explicit `<think>...</think>` reflection prior to committing state changes.
+- **Superpowers Verification Gate:** No step is marked complete without deterministic evidence.

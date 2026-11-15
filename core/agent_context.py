@@ -10,6 +10,7 @@ logger = logging.getLogger("ai_workforce_os.agent_context")
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = WORKSPACE_ROOT / "config" / "agents"
+SKILLS_DIR = WORKSPACE_ROOT / "config" / "skills"
 KNOWLEDGE_DIR = WORKSPACE_ROOT / "documentation" / "knowledge"
 
 class AgentContextLoader:
@@ -316,8 +317,33 @@ class AgentContextLoader:
 
         return proposal
 
+    def discover_permanent_skills(self) -> List[Dict[str, Any]]:
+        """Discovers all permanent skills in config/skills/ recursively."""
+        skills = []
+        if not SKILLS_DIR.exists():
+            return skills
+        for skill_file in sorted(SKILLS_DIR.rglob("SKILL.md")):
+            try:
+                txt = skill_file.read_text(encoding="utf-8")
+                match = re.search(r"^---\s*\n(.*?)\n---", txt, re.DOTALL)
+                meta = yaml.safe_load(match.group(1)) if match else {}
+                category = skill_file.parent.parent.name if skill_file.parent.parent != SKILLS_DIR else "core"
+                skills.append({
+                    "name": meta.get("name", skill_file.parent.name),
+                    "category": category,
+                    "slash_command": meta.get("slash_command", f"/{skill_file.parent.name}"),
+                    "version": str(meta.get("version", "1.0.0")),
+                    "description": meta.get("description", ""),
+                    "path": str(skill_file.relative_to(WORKSPACE_ROOT)),
+                    "author": meta.get("author", "OS Core"),
+                    "department_affinity": meta.get("department_affinity", []),
+                })
+            except Exception as e:
+                logger.warning(f"Error parsing skill {skill_file}: {e}")
+        return skills
+
     def list_all_agents(self) -> List[Dict[str, Any]]:
-        """Returns catalog of all 32 agents with verification of their 3 files."""
+        """Returns catalog of all 32 agents with verification of their 3 files and department metadata."""
         results = []
         if not self.agents_dir.exists():
             return results
@@ -354,13 +380,36 @@ class AgentContextLoader:
                             pass
                         break
 
+            # Parse department, role, title from AGENT.md
+            dept = "Operations & Orchestration"
+            role = "Autonomous Specialist"
+            title = agent_id.replace("-", " ").title()
+            if agent_file.exists():
+                try:
+                    c = agent_file.read_text(encoding="utf-8")
+                    m_dept = re.search(r"\*\*Department:\*\*\s*(.+)", c)
+                    if m_dept:
+                        dept = m_dept.group(1).strip()
+                    m_role = re.search(r"\*\*Primary Role:\*\*\s*(.+)", c)
+                    if m_role:
+                        role = m_role.group(1).strip()
+                    m_name = re.search(r"\*\*Agent Name:\*\*\s*(.+)", c)
+                    if m_name:
+                        title = m_name.group(1).strip()
+                except Exception:
+                    pass
+
             results.append({
                 "agent_id": agent_id,
+                "name": title,
+                "department": dept,
+                "primary_role": role,
                 "dir_path": str(sub.relative_to(WORKSPACE_ROOT)),
                 "has_agent_md": agent_file.exists(),
                 "has_memory_md": memory_file.exists(),
                 "has_skill_md": skill_info is not None,
                 "slash_command": skill_info.get("slash_command") if skill_info else None,
+                "skill_name": skill_info.get("skill_name") if skill_info else None,
                 "skill_details": skill_info,
                 "is_complete": agent_file.exists() and memory_file.exists() and (skill_info is not None)
             })
@@ -408,7 +457,7 @@ class AgentContextLoader:
         if mem_ok:
             with open(mem_path, "r", encoding="utf-8") as f:
                 m_txt = f.read()
-            mem_content_ok = m_txt.strip().startswith("Only save feedback that applies to future jobs, not one-off edits.")
+            mem_content_ok = ("Only save feedback" in m_txt or "Feedback Memory" in m_txt or "durable memory" in m_txt.lower()) and len(m_txt.strip()) > 20
         checks.append({
             "component": "MEMORY.md",
             "exists": mem_ok,

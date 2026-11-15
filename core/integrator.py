@@ -529,6 +529,12 @@ class SystemIntegratorEngine:
             if ag_info.get("has_skill_md"):
                 s_det = ag_info["skill_details"]
                 skills_md.append(f"- **`{s_det['slash_command']}`** ({ag_info['agent_id']}): `{s_det['path']}` - {s_det['description']}")
+
+        perm_skills = loader.discover_permanent_skills()
+        if perm_skills:
+            skills_md.append("\n### Permanent Sovereign Harnesses & Framework Skills:\n")
+            for ps in perm_skills:
+                skills_md.append(f"- **`{ps['slash_command']}`** ([{ps['category']}] {ps['name']}): `{ps['path']}` - {ps['description']}")
                 
         with open(KNOWLEDGE_DIR / "SKILLS_INDEX.md", "w", encoding="utf-8") as f:
             f.write("\n".join(skills_md) + "\n")

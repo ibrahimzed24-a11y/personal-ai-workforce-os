@@ -23,3 +23,7 @@ This file contains permanent operational lessons, owner preferences, and durable
 1. **Deduplication:** Always check existing memory before adding an entry. Never record duplicate lessons.
 2. **Zero-Secret Guarantee:** Any proposed memory update containing credentials or API keys will be rejected by the OS runtime.
 3. **Controlled Updates:** Memory proposals are filtered by the `AgentContextLoader` guardrails before persistence.
+
+## Integrated Permanent Harnesses
+- Department: Engineering & Technology
+- Active: DeepSeek CoT, Superpowers, ECC AgentShield, Addy Osmani, Browser-Use CDP

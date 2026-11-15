@@ -114,3 +114,136 @@ def test_project_llm_configuration_and_sanitization():
     assert sanitized["llm_api_key"] == "••••••••"
     assert sanitized["llm_provider"] == "claude"
     assert sanitized["llm_model"] == "claude-3-7-sonnet-20250219"
+
+
+def test_multi_format_exporter_and_guardrails():
+    from pathlib import Path
+    from core.exporter import (
+        MultiFormatExporter,
+        generate_and_save_stage_report,
+        resolve_scoped_path,
+        ProjectPathViolationError
+    )
+
+    # 1. Path Guardrail
+    try:
+        resolve_scoped_path("valioz-health", "../../etc/shadow")
+        assert False, "Should raise ProjectPathViolationError"
+    except ProjectPathViolationError:
+        pass
+
+    # 2. Multi-Format Deliverable Generation
+    slug = "valioz-health"
+    task_id = "test-task-suite-01"
+
+    pdf_res = generate_and_save_stage_report(
+        project_slug=slug,
+        task_id=task_id,
+        agent_id="coordinator",
+        step_index=1,
+        title="Stage 1 Verification",
+        sections={"Summary": "Scope validated.", "Records": 5},
+        file_format="pdf"
+    )
+    assert pdf_res["file_size"] > 0
+    assert Path(pdf_res["local_path"]).exists()
+
+    docx_res = generate_and_save_stage_report(
+        project_slug=slug,
+        task_id=task_id,
+        agent_id="browser-researcher",
+        step_index=2,
+        title="Stage 2 Dossier",
+        sections={"Intelligence": ["Lead A", "Lead B"]},
+        file_format="docx"
+    )
+    assert docx_res["file_size"] > 0
+    assert Path(docx_res["local_path"]).exists()
+
+    xlsx_res = generate_and_save_stage_report(
+        project_slug=slug,
+        task_id=task_id,
+        agent_id="data-extractor",
+        step_index=3,
+        title="Stage 3 Data",
+        sections={},
+        file_format="xlsx",
+        tabular_data=[["Lead", "Score"], ["Alpha", 98]]
+    )
+    assert xlsx_res["file_size"] > 0
+    assert Path(xlsx_res["local_path"]).exists()
+
+
+def test_slash_command_router_and_add_agent():
+    import asyncio
+    from core.orchestrator import PipelineHandoverOrchestrator
+    from api.index import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+    orchestrator = PipelineHandoverOrchestrator(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    dummy_project = {
+        "id": "ec48c7ae-185b-4ec9-bf2c-183024b740f4",
+        "name": "valioz health sales",
+        "slug": "valioz-health-sales",
+        "assigned_agents": ["coordinator", "browser-researcher"]
+    }
+    dummy_user = {"id": "3ff7069c-7720-43de-92ca-892170124f62", "email": "ibrahim.zed24@gmail.com"}
+
+    async def _run():
+        res = await orchestrator.handle_slash_command(
+            raw_message="/direct coordinator Focus on high-intent Canadian leads",
+            project=dummy_project,
+            user=dummy_user,
+            token=SUPABASE_SERVICE_ROLE_KEY,
+            documents=[],
+            tools=[]
+        )
+        assert res is not None
+        assert res["role"] == "coordinator"
+        assert "Steering Directive Acknowledged" in res["content"]
+
+    asyncio.run(_run())
+
+
+def test_32_agents_and_8_departments_architecture():
+    from core.agent_context import AgentContextLoader
+    loader = AgentContextLoader()
+    agents = loader.list_all_agents()
+    assert len(agents) == 32, f"Expected 32 agents, found {len(agents)}"
+
+    valid_count = 0
+    for a in agents:
+        v = loader.validate_agent_architecture(a["agent_id"])
+        if v.get("valid"):
+            valid_count += 1
+    assert valid_count == 32, f"Expected all 32 agents to be valid, got {valid_count}"
+
+    # Verify API endpoint returns real agents
+    res = cloud_client.get("/api/agents")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["count"] == 32
+    assert len(data["departments"]) == 8
+
+
+def test_permanent_framework_skills_and_events():
+    from core.agent_context import AgentContextLoader
+    loader = AgentContextLoader()
+    skills = loader.discover_permanent_skills()
+    assert len(skills) >= 15
+    categories = set(s["category"] for s in skills)
+    assert "deepseek" in categories
+    assert "superpowers" in categories
+    assert "ecc" in categories
+    assert "addyosmani" in categories
+    assert "browser-use" in categories
+
+    # Test API endpoint
+    res = cloud_client.get("/api/skills")
+    assert res.status_code == 200
+    assert res.json()["count"] >= 15
+
+    # Test events endpoint returns 200
+    ev_res = cloud_client.get("/api/events")
+    assert ev_res.status_code == 200
+    assert "events" in ev_res.json()
+

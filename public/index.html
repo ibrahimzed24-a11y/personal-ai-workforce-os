@@ -6,7 +6,7 @@
   <title>Personal AI Workforce OS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=3.3.0" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -95,6 +95,18 @@
             <p>Give instructions in plain English or Egyptian Arabic (اتكلم بالمصري أو بالإنجليزي). Your Coordinator will route the task through the project's agents, utilize your uploaded core data harness, and return an Admin Report.</p>
           </div>
         </div>
+        <!-- Slash Command & Agent Quick Pills -->
+        <div class="chat-command-bar">
+          <span class="cmd-pill" onclick="insertChatCommand('/ask coordinator ')">/ask</span>
+          <span class="cmd-pill" onclick="insertChatCommand('/direct coordinator ')">/direct</span>
+          <span class="cmd-pill" onclick="insertChatCommand('/assign coordinator,browser-researcher,master-reporting-agent ')">/assign</span>
+          <span class="cmd-pill" onclick="insertChatCommand('/add-agent ')">/add-agent</span>
+          <span class="cmd-pill agent" onclick="insertChatCommand('@coordinator ')">@coordinator</span>
+          <span class="cmd-pill agent" onclick="insertChatCommand('@browser-researcher ')">@browser-researcher</span>
+          <span class="cmd-pill agent" onclick="insertChatCommand('@software-engineer ')">@software-engineer</span>
+          <span class="cmd-pill agent" onclick="insertChatCommand('@master-reporting-agent ')">@master-reporting-agent</span>
+        </div>
+
         <form id="chat-form" class="chat-composer">
           <input type="text" id="chat-input" dir="auto" placeholder="Type a task in English or Egyptian Arabic (مثال: راجع ليدز عيادات الأسنان في كندا وجهز إيميل مبيعات لكل عيادة)..." required />
           <button type="submit" id="chat-send-btn" class="btn-primary">Send to Team</button>
@@ -200,9 +212,38 @@
                 <h3>32 Sovereign Autonomous Agents</h3>
                 <p class="subtext" style="margin:0;">Standardized 3-file architecture (AGENT.md, SKILL.md, MEMORY.md) across 8 specialized departments.</p>
               </div>
-              <span class="step-chip">32/32 Active</span>
+              <span class="step-chip" id="agents-active-chip">32/32 Active</span>
             </div>
+
+            <!-- Department Filter Pills -->
+            <div id="dept-filter-bar" class="filter-pills-row" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:1rem;">
+              <button class="filter-pill active" data-dept="all">All 32 Agents</button>
+              <button class="filter-pill" data-dept="Operations & Orchestration">Operations</button>
+              <button class="filter-pill" data-dept="Research & Market Strategy">Research & SEO</button>
+              <button class="filter-pill" data-dept="Growth & Communications">Growth</button>
+              <button class="filter-pill" data-dept="Engineering & Technology">Engineering</button>
+              <button class="filter-pill" data-dept="Automation & Data Acquisition">Browser Automation</button>
+              <button class="filter-pill" data-dept="Infrastructure & Operations">Infrastructure</button>
+              <button class="filter-pill" data-dept="Executive & Audit">Executive & Audit</button>
+              <button class="filter-pill" data-dept="System Architecture & Integration">Architecture</button>
+            </div>
+
             <div id="agents-grid" class="agents-grid"></div>
+          </div>
+
+          <!-- Permanent Framework Harnesses & Skills Section -->
+          <div class="card" style="margin-top:1.25rem;">
+            <div class="row-between" style="margin-bottom:0.75rem;">
+              <div>
+                <h3 style="display:flex; align-items:center; gap:0.5rem;">
+                  <span class="dot emerald"></span>
+                  Permanent Sovereign Harnesses & Framework Skills
+                </h3>
+                <p class="subtext" style="margin:0;">Equipped across the workforce: DeepSeek CoT, Superpowers TDD, ECC AgentShield, Addy Osmani Lifecycle, and Browser-Use CDP.</p>
+              </div>
+              <span class="badge-subtle" id="harness-count-badge">19 Active Skills</span>
+            </div>
+            <div id="permanent-skills-grid" class="skills-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:0.75rem;"></div>
           </div>
         </div>
       </section>
@@ -418,12 +459,23 @@
 
   <!-- Agent Blueprint Inspection Drawer/Modal -->
   <div id="agent-blueprint-modal" class="modal-backdrop hidden">
-    <div class="modal-card" style="max-width:680px; max-height:85vh; display:flex; flex-direction:column;">
-      <div class="row-between">
-        <h3 id="modal-agent-name">Agent Blueprint</h3>
+    <div class="modal-card" style="max-width:720px; max-height:85vh; display:flex; flex-direction:column;">
+      <div class="row-between" style="border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+        <div>
+          <h3 id="modal-agent-name" style="margin:0;">Agent Blueprint</h3>
+          <p id="modal-agent-meta" class="subtext" style="margin:0; font-size:0.8rem;"></p>
+        </div>
         <button type="button" id="close-agent-modal-btn" class="btn-secondary small">Close</button>
       </div>
-      <div id="blueprint-content" style="flex:1; overflow-y:auto; margin:1rem 0; font-family:'JetBrains Mono', monospace; font-size:0.82rem; background:var(--surface-alt); padding:1rem; border-radius:8px; white-space:pre-wrap;"></div>
+
+      <!-- 3-File Architecture Tabs -->
+      <div class="tab-bar" style="margin-top:0.75rem; margin-bottom:0.75rem;">
+        <button class="tab-btn active blueprint-tab-btn" data-doc="agent">AGENT.md (Operating Rules)</button>
+        <button class="tab-btn blueprint-tab-btn" data-doc="skill">SKILL.md (Job Procedure)</button>
+        <button class="tab-btn blueprint-tab-btn" data-doc="memory">MEMORY.md (Feedback Memory)</button>
+      </div>
+
+      <div id="blueprint-content" style="flex:1; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:0.82rem; background:var(--surface-alt); padding:1rem; border-radius:8px; white-space:pre-wrap; border:1px solid var(--border);"></div>
     </div>
   </div>
 
@@ -446,6 +498,61 @@
     </div>
   </div>
 
-  <script src="/app.js"></script>
+  <!-- Pipeline Handover Edge Inspector Modal -->
+  <div id="handover-modal" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width:760px; max-height:85vh; display:flex; flex-direction:column;">
+      <div class="row-between">
+        <div>
+          <h3 id="handover-modal-title">Handover Packet Inspector</h3>
+          <span id="handover-modal-subtitle" class="subtext" style="font-size:0.78rem; margin:0;">Stage Handoff Telemetry & Payload</span>
+        </div>
+        <button type="button" id="close-handover-modal-btn" class="btn-secondary small">Close</button>
+      </div>
+
+      <div style="flex:1; overflow-y:auto; margin:1rem 0; display:flex; flex-direction:column; gap:1rem;">
+        <!-- Status & Node Transition -->
+        <div class="handover-transition-card">
+          <div class="transition-agent">
+            <span class="dot emerald"></span>
+            <strong id="handover-from-agent">Coordinator</strong>
+          </div>
+          <span class="transition-arrow">➔ 5-Stage Verification Passed ➔</span>
+          <div class="transition-agent">
+            <span class="dot blue"></span>
+            <strong id="handover-to-agent">Browser Researcher</strong>
+          </div>
+        </div>
+
+        <!-- Completed vs Pending Ledgers -->
+        <div class="grid-2col">
+          <div class="card" style="padding:1rem;">
+            <strong style="font-size:0.84rem; color:var(--accent);">Completed in this Stage</strong>
+            <ul id="handover-completed-list" style="margin-top:0.5rem; font-size:0.8rem; padding-left:1.1rem; line-height:1.5;"></ul>
+          </div>
+          <div class="card" style="padding:1rem;">
+            <strong style="font-size:0.84rem; color:var(--text);">Pending / Context for Next Stage</strong>
+            <ul id="handover-pending-list" style="margin-top:0.5rem; font-size:0.8rem; padding-left:1.1rem; line-height:1.5;"></ul>
+          </div>
+        </div>
+
+        <!-- Raw JSON Payload -->
+        <div>
+          <label>Raw HandoverPayload Contract (Deterministic JSON)</label>
+          <pre id="handover-raw-json" style="font-family:'JetBrains Mono', monospace; font-size:0.78rem; background:var(--surface-alt); padding:0.85rem; border-radius:8px; overflow-x:auto; max-height:220px; border:1px solid var(--border);"></pre>
+        </div>
+      </div>
+
+      <div class="row-between" style="border-top:1px solid var(--border); padding-top:0.9rem;">
+        <div style="display:flex; gap:0.5rem;">
+          <button type="button" class="btn-primary small" onclick="interveneHandover('approve')">Approve Handover</button>
+          <button type="button" class="btn-secondary small" onclick="interveneHandover('retry')">Retry Stage</button>
+          <button type="button" class="btn-danger small" onclick="interveneHandover('rollback')">Rollback State</button>
+        </div>
+        <button type="button" class="btn-secondary small" onclick="document.getElementById('handover-modal').classList.add('hidden')">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=3.3.0"></script>
 </body>
 </html>
