@@ -30,6 +30,9 @@ __pycache__/
 htmlcov/
 
 # Local Database & Operational Runtime State
+data/*.db
+data/*.sqlite
+data/*.sqlite3
 data/*.db-wal
 data/*.db-shm
 data/*.pid
