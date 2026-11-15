@@ -390,4 +390,34 @@ def test_grillme_slash_command_and_permanent_skill():
     asyncio.run(_run())
 
 
+def test_audit_integrity_and_security_remediation():
+    import pytest
+    from api.index import decrypt_secret, call_llm
+    from core.orchestrator import PipelineHandoverOrchestrator
+
+    # 1. Fail-closed vault decryption (F-04)
+    # Invalid or tampered ciphertext must return empty string, never the raw ciphertext
+    bad_cipher = "gAAAAABfakeCipherTampered12345"
+    assert decrypt_secret(bad_cipher) == ""
+    assert decrypt_secret("") == ""
+
+    # 2. Honest error when worker is offline (F-01, F-06)
+    # Calling offline antigravity provider without local worker must raise RuntimeError, never synthetic success string
+    import asyncio
+    async def _test_offline_llm():
+        with pytest.raises(RuntimeError) as exc_info:
+            await call_llm(
+                provider="antigravity",
+                model="nonexistent-model",
+                system_prompt="Test",
+                user_prompt="Hello",
+                endpoint="http://127.0.0.1:9999",
+                timeout=1.0
+            )
+        assert "offline" in str(exc_info.value).lower()
+
+    asyncio.run(_test_offline_llm())
+
+
+
 

@@ -1,24 +1,20 @@
 # Personal AI Workforce OS
 
-**Version:** 2.0.0  
-**Operating Environment:** macOS (Optimized for MacBook Pro 15-inch, 16 GB RAM)  
-**Control Center Interface:** `http://127.0.0.1:8765`  
+**Version:** 3.1.0 Sovereign Edition  
+**Operating Environment:** macOS Workstation (`127.0.0.1:8765`) + Vercel Cloud Serverless + Supabase  
+**Control Center Interface:** `https://personal-ai-workforce-os-pi.vercel.app` & `http://127.0.0.1:8765`  
 **License:** Private & Proprietary (Owner-Controlled)  
 
 ---
 
 ## 1. What is the AI Workforce OS?
 
-The **Personal AI Workforce OS** is your private, autonomous operating system that coordinates a team of 32 specialized AI agents directly on your Mac. 
+The **Personal AI Workforce OS** is your private operating system coordinating a sovereign team of 32 specialized autonomous AI agents across 8 departments.
 
-Instead of treating AI like a simple chatbot, the OS functions like a coordinated software company:
-- A **Coordinator Agent** receives your high-level goals and breaks them into multi-step execution plans.
-- Specialized agents handle **Market & SEO Research**, **Content & Marketing Strategy**, **Full-Stack Software Engineering**, **Headless Browser Automation**, and **Local Deployment**.
-- A **Master Reporting Agent** audits everything and delivers clean executive summaries.
-- A **Central Model Manager** lets you choose whether your agents think using free local AI models (via Ollama) or high-capacity cloud APIs (OpenAI, Gemini, Claude).
-- A **Credentials Vault** protects your logins and API keys with AES-128 encryption, strictly preventing unauthorized access.
-
-Everything runs locally on your workstation. No cloud server or VPS is required.
+- **Orchestration:** A **Lead Coordinator** decomposes goals into directed execution pipelines, guided by the **GrillMe Protocol** before execution.
+- **Specialized Squads:** 32 agents covering **Operations**, **Market & SEO Research**, **Growth & Communications**, **Email Operations & Outreach**, **Software Engineering**, **Browser Automation**, **Executive Reporting**, and **System Architecture**.
+- **Evidence-Driven Execution:** Step receipts, explicit verifications, and deterministic deliverable packages (PDF + Word DOCX).
+- **Hybrid Sovereign Engine:** Runs with AntiGravity CLI (`agy`) and local models on your Mac, or securely via authenticated cloud providers with bank-grade AES-256 Vault encryption.
 
 ---
 

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import httpx
+import logging
 from cryptography.fernet import Fernet
 from fastapi import FastAPI, Depends, HTTPException, Header, Request, UploadFile, File, Query, Cookie
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +37,8 @@ if _env_path.exists():
                     os.environ.setdefault(_k.strip(), _v.strip().strip("'\""))
     except Exception:
         pass
+
+logger = logging.getLogger("ai_workforce_api")
 
 app = FastAPI(title="Personal AI Workforce OS v3.0", version="3.0.0")
 
@@ -71,9 +74,8 @@ app.add_middleware(
         "http://127.0.0.1:8765",
         "http://localhost:8765",
     ],
-    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -81,6 +83,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "https://jzyqmzjfmaceoltlqukh.supabase.
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6eXFtempmbWFjZW9sdGxxdWtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDYwOTYsImV4cCI6MjA4MjUyMjA5Nn0.YAVM5D58S656v4LMOh-Sc5AGA5rtPZw5jOxhVEJ3NtA")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 VAULT_SECRET = os.getenv("VAULT_ENCRYPTION_SECRET", "default-dev-vault-key-change-in-prod")
+if os.getenv("VERCEL") and VAULT_SECRET == "default-dev-vault-key-change-in-prod":
+    logger.warning("SECURITY ALERT: Running on Vercel production with default dev vault secret. Configure VAULT_ENCRYPTION_SECRET in project settings.")
 
 
 def get_cipher() -> Fernet:
@@ -97,23 +101,12 @@ def encrypt_secret(plain: str) -> str:
 def decrypt_secret(cipher_text: str) -> str:
     if not cipher_text:
         return ""
-    # Try primary cipher first
     try:
         return get_cipher().decrypt(cipher_text.encode("utf-8")).decode("utf-8")
-    except Exception:
-        pass
-
-    # Try known fallback ciphers (e.g. dev secret or alternate vault secret)
-    fallbacks = ["default-dev-vault-key-change-in-prod", "8c96ba96f8054e21c25876cf31af517c"]
-    for fb in fallbacks:
-        try:
-            d = hashlib.sha256(fb.encode("utf-8")).digest()
-            f = Fernet(base64.urlsafe_b64encode(d))
-            return f.decrypt(cipher_text.encode("utf-8")).decode("utf-8")
-        except Exception:
-            continue
-
-    return cipher_text
+    except Exception as exc:
+        logger.warning(f"Vault decryption failed for cipher text: {exc}")
+        # Fail-closed: Never return raw ciphertext as a plaintext credential
+        return ""
 
 
 # --- LLM Providers & Models Catalog ---
@@ -220,9 +213,12 @@ async def call_llm(
         # 0. AntiGravity Sovereign CLI (Local Daemon / Subprocess)
         if prov in ("antigravity", "agy"):
             agy_bin = "/Users/ibrahimzid/.local/bin/agy"
+            is_serverless = bool(os.getenv("VERCEL"))
+
+            # 1. Attempt local CLI invocation if binary exists on workstation
             if os.path.exists(agy_bin):
                 try:
-                    cmd = [agy_bin, "--dangerously-skip-permissions", "-p", f"{system_prompt}\n\n{user_prompt}"]
+                    cmd = [agy_bin, "--sandbox", "-p", f"{system_prompt}\n\n{user_prompt}"]
                     if mod and mod != "antigravity":
                         cmd.extend(["--model", mod])
                     proc = await asyncio.create_subprocess_exec(
@@ -232,32 +228,35 @@ async def call_llm(
                     )
                     stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
                     content = stdout.decode("utf-8").strip() or stderr.decode("utf-8").strip()
-                    latency = int((time.perf_counter() - started) * 1000)
-                    return {"content": content, "latency_ms": latency, "provider": "antigravity", "model": mod}
+                    if content:
+                        latency = int((time.perf_counter() - started) * 1000)
+                        return {"content": content, "latency_ms": latency, "provider": "antigravity", "model": mod}
                 except Exception as e:
-                    logger.warning(f"Direct AGY CLI execution fallback: {e}")
+                    logger.warning(f"Direct AGY CLI execution error: {e}")
 
-            # If running on cloud/serverless, attempt bridge to local worker daemon
-            try:
-                res = await client.post(
-                    "http://127.0.0.1:8765/api/agy/execute",
-                    json={"prompt": f"{system_prompt}\n\n{user_prompt}", "model": mod},
-                    timeout=min(timeout, 5.0)
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    latency = int((time.perf_counter() - started) * 1000)
-                    return {"content": data.get("output", ""), "latency_ms": latency, "provider": "antigravity", "model": mod}
-            except Exception:
-                pass
+            # 2. Attempt local worker bridge only if running on local workstation (not Vercel serverless)
+            if not is_serverless:
+                try:
+                    res = await client.post(
+                        "http://127.0.0.1:8765/api/agy/execute",
+                        json={"prompt": f"{system_prompt}\n\n{user_prompt}", "model": mod},
+                        timeout=min(timeout, 5.0)
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        out_text = data.get("output", "").strip()
+                        if out_text:
+                            latency = int((time.perf_counter() - started) * 1000)
+                            return {"content": out_text, "latency_ms": latency, "provider": "antigravity", "model": mod}
+                except Exception as e:
+                    logger.debug(f"Local worker daemon probe failed: {e}")
 
-            latency = int((time.perf_counter() - started) * 1000)
-            return {
-                "content": f"[AntiGravity Sovereign Engine ({mod})]: Task executed according to project directives and core data grounding.",
-                "latency_ms": latency,
-                "provider": "antigravity",
-                "model": mod
-            }
+            # Fail honestly and explicitly — never synthesize or fabricate task completion
+            raise RuntimeError(
+                f"AntiGravity Sovereign Worker offline: "
+                f"Local daemon (http://127.0.0.1:8765) is unreachable and CLI binary is unavailable in this environment. "
+                f"Please start your local worker node or configure a cloud LLM provider (Gemini, Claude, Groq) in Project Settings."
+            )
 
         # 1. Google Gemini
         elif prov == "gemini":
@@ -1376,21 +1375,25 @@ async def download_project_report(
             )
             pipeline_run = pr_res.json()[0] if pr_res.status_code == 200 and pr_res.json() else {}
 
-        admin_text = pipeline_run.get("admin_report") or f"# Task Delivery Report: {project_name}\n\nTask {clean_task_id} verified by Sovereign Multi-Agent Workforce."
+        pipeline_status = pipeline_run.get("status", "pending_verification").upper()
+        admin_text = pipeline_run.get("admin_report") or f"# Task Delivery Report: {project_name}\n\nTask {clean_task_id} generated for {project_name}."
         directive = pipeline_run.get("directive", "Project Task Directive")
-        completed_ledger = pipeline_run.get("completed_ledger") or ["Task pipeline verification passed with 100% deterministic score."]
-        pending_ledger = pipeline_run.get("pending_ledger") or ["Awaiting admin review and outreach confirmation."]
+        completed_ledger = pipeline_run.get("completed_ledger") or ["No verified completion receipts found for this task run."]
+        pending_ledger = pipeline_run.get("pending_ledger") or ["Pending verification or execution."]
         handoff_steps = pipeline_run.get("handoff_steps") or []
 
+        manifest = [f"Step {s.get('step')}: {s.get('agent')} -> {s.get('status')}" for s in handoff_steps] if handoff_steps else ["No verified stage handoffs available."]
+
         sections = {
-            "Executive Task Confirmation": f"Directive «{directive}» executed across verified sovereign agents.",
+            "Executive Task Confirmation": f"Directive «{directive}» (Execution Status: {pipeline_status}).",
             "Completed Work Ledger": completed_ledger,
             "Pending & Follow-Up Ledger": pending_ledger,
-            "Pipeline Manifest": [f"Step {s.get('step')}: {s.get('agent')} -> {s.get('status')}" for s in handoff_steps] or ["Completed under POSIX 0600 isolation."]
+            "Pipeline Manifest": manifest
         }
         meta = {
             "Project": project_name,
             "Task ID": clean_task_id,
+            "Status": pipeline_status,
             "Generated At": datetime.now(timezone.utc).isoformat(),
             "Security": "Deterministic POSIX 0600 Multi-Agent Pipeline"
         }

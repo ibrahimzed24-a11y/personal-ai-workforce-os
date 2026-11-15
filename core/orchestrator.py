@@ -187,8 +187,9 @@ class PipelineHandoverOrchestrator:
             content = llm_res["content"].strip()
             runtime_info = f"{provider} ({model})"
         except Exception as exc:
-            content = f"[{agent_id}] Verified state for query: '{question}'. Operating in sovereign memory mode.\nObservation: Context inspected across {len(documents)} core project files."
-            runtime_info = "AntiGravity Sovereign Fallback"
+            logger.warning(f"LLM invocation failed for /ask @{agent_id}: {exc}")
+            content = f"⚠️ [Execution Error for @{agent_id}]: Unable to retrieve model response for query '{question}'. Reason: {exc}. Verify that your local worker is connected (http://127.0.0.1:8765) or configure your LLM provider credentials in Project Settings."
+            runtime_info = "Provider Execution Error"
 
         latency_ms = int((time.perf_counter() - started) * 1000)
 
@@ -233,21 +234,31 @@ class PipelineHandoverOrchestrator:
         now_iso = datetime.now(timezone.utc).isoformat()
 
         # Update local project notes / memory
+        persisted = False
         try:
             proj_root = get_project_root(project_slug)
             memory_file = proj_root / "ACTIVE_DIRECTIVES.md"
             with open(memory_file, "a", encoding="utf-8") as f:
                 f.write(f"\n### [{now_iso}] Steering Directive for @{agent_id}\n- {instruction}\n")
+            persisted = True
         except Exception as exc:
             logger.warning(f"Failed to append to active directives file: {exc}")
+            persisted = False
+
+        if persisted:
+            status_label = "ACTIVE_CONSTRAINT_ENFORCED"
+            persistence_label = f"Persisted to `./projects/{project_slug}/ACTIVE_DIRECTIVES.md`."
+        else:
+            status_label = "PERSISTENCE_WARNING"
+            persistence_label = "Warning: Local filesystem write failed. Directive buffered in session memory only."
 
         ack_content = (
             f"🎯 **Steering Directive Acknowledged & Injected for `@{agent_id}`**\n\n"
             f"- **Target Agent:** `{agent_id}`\n"
             f"- **Project Namespace:** `{project_slug}`\n"
             f"- **Directive:** «{instruction}»\n"
-            f"- **Status:** `ACTIVE_CONSTRAINT_ENFORCED`\n"
-            f"- **Policy Guardrail:** Persisted to `./projects/{project_slug}/ACTIVE_DIRECTIVES.md`."
+            f"- **Status:** `{status_label}`\n"
+            f"- **Policy Guardrail:** {persistence_label}"
         )
 
         latency_ms = int((time.perf_counter() - started) * 1000)
@@ -876,6 +887,28 @@ Capabilities:
 
         total_latency_ms = int((time.perf_counter() - pipeline_start) * 1000)
 
+        # Derive terminal execution status strictly from step receipts
+        has_failures = any(s.get("verification_status") in ("FAILED", "FAILED_RETRY", "ERROR") for s in handoff_steps)
+        has_blocked = any(s.get("verification_status") == "BLOCKED" for s in handoff_steps)
+        all_verified = bool(handoff_steps) and all(s.get("verification_status") in ("VERIFIED", "VERIFIED_COMPLETE") for s in handoff_steps)
+
+        if has_failures:
+            terminal_status = "failed"
+            term_verif_status = "FAILED"
+            check_label = f"Verification Failed ({sum(1 for s in handoff_steps if s.get('verification_status') == 'VERIFIED')}/{len(handoff_steps)} Steps Passed)"
+        elif has_blocked:
+            terminal_status = "blocked"
+            term_verif_status = "BLOCKED"
+            check_label = "Execution Blocked (Missing Dependencies or Worker)"
+        elif all_verified:
+            terminal_status = "completed"
+            term_verif_status = "VERIFIED_COMPLETE"
+            check_label = f"Deterministic Pass ({len(handoff_steps)}/{len(handoff_steps)} Steps Verified)"
+        else:
+            terminal_status = "partially_completed"
+            term_verif_status = "PARTIALLY_COMPLETED"
+            check_label = f"Partially Completed ({sum(1 for s in handoff_steps if s.get('verification_status') == 'VERIFIED')}/{len(handoff_steps)} Steps Verified)"
+
         # 4. Compile Final Plain-Language Admin Report
         final_master_text = (
             f"🏁 **Final Master Task Report: `{project['name']}`**\n\n"
@@ -884,7 +917,7 @@ Capabilities:
             f"- **Project Namespace:** `{project_slug}`\n"
             f"- **Directive Executed:** «{directive}»\n"
             f"- **Agent Pipeline:** `{' ➔ '.join(agents)}`\n"
-            f"- **Total Duration:** `{total_latency_ms}ms` | **Verification Check:** `100% Deterministic Pass (6/6 Checks)`\n\n"
+            f"- **Total Duration:** `{total_latency_ms}ms` | **Verification Check:** `{check_label}`\n\n"
             f"### 2. Completed Work Ledger (What Has Been Done)\n"
             + "\n".join(f"  ✓ {item}" for item in completed_ledger) +
             f"\n\n### 3. Pending & Follow-Up Ledger (What Is Pending)\n"
@@ -906,7 +939,7 @@ Capabilities:
                     "task_id": task_id,
                     "directive": directive,
                     "runtime_used": f"Multi-Agent Handover Pipeline ({len(agents)} agents)",
-                    "status": "completed",
+                    "status": terminal_status,
                     "handoff_steps": handoff_steps,
                     "admin_report": final_master_text,
                     "completed_ledger": completed_ledger,
@@ -928,7 +961,7 @@ Capabilities:
                     "content": final_master_text,
                     "artifacts": exported_artifacts,
                     "latency_ms": total_latency_ms,
-                    "stage_status": "COMPLETED"
+                    "stage_status": terminal_status.upper()
                 }
             )
 
@@ -939,8 +972,8 @@ Capabilities:
                     f"{self.supabase_url}/rest/v1/tasks?id=eq.{task_id}",
                     headers=self._headers(token),
                     json={
-                        "status": "completed",
-                        "verification_status": "VERIFIED_COMPLETE",
+                        "status": terminal_status,
+                        "verification_status": term_verif_status,
                         "completed_at": datetime.now(timezone.utc).isoformat(),
                         "output_result": {"completed_ledger": completed_ledger, "pending_ledger": pending_ledger}
                     }
@@ -965,7 +998,7 @@ Capabilities:
 
         return {
             "task_id": task_id,
-            "status": "completed",
+            "status": terminal_status,
             "handoff_steps": handoff_steps,
             "completed_ledger": completed_ledger,
             "pending_ledger": pending_ledger,
