@@ -1,0 +1,12 @@
+# Core Web & API Framework
+fastapi>=0.163.0
+uvicorn>=0.54.0
+pydantic>=2.14.3
+
+# HTTP Client & Cloud Integration
+httpx>=0.28.1
+
+# Configuration & Data Handling
+pyyaml>=6.0.3
+aiosqlite>=0.22.1
+cryptography<=48.0.1

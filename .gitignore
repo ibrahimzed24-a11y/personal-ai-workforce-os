@@ -38,9 +38,8 @@ data/*.db-shm
 data/*.pid
 
 # Runtime Logs, PIDs & Screenshots
-logs/*.log
-logs/*.pid
-logs/screenshots/
+logs/*
+!logs/.gitkeep
 
 # Temporary & Ephemeral Scratchpads
 temp/
