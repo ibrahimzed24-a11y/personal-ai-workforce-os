@@ -287,3 +287,25 @@ def test_serverless_read_only_resilience():
     assert rep["verification_status"] == "VERIFIED"
     assert rep["file_size"] > 0
 
+
+def test_download_auth_query_parameter_and_squad_selection():
+    import os
+    # 1. Unauthenticated download fails with 401
+    assert cloud_client.get("/api/projects/123/reports/rep-1/download").status_code == 401
+
+    # 2. Invalid token fails with 401
+    assert cloud_client.get("/api/projects/123/reports/rep-1/download?token=bad_token").status_code == 401
+
+    # 3. Agents catalog returns 32 sovereign agents with valid ids
+    agents_res = cloud_client.get("/api/agents")
+    assert agents_res.status_code == 200
+    agents_data = agents_res.json()
+    assert agents_data["count"] == 32
+    agent_ids = [a.get("id") or a.get("agent_id") for a in agents_data["agents"]]
+    assert "coordinator" in agent_ids
+    assert "market-seo-geo-researcher" in agent_ids
+    assert "software-engineer" in agent_ids
+    assert "browser-use-agent" in agent_ids
+    assert "master-reporting-agent" in agent_ids
+
+

@@ -403,6 +403,7 @@ class AgentContextLoader:
                     pass
 
             results.append({
+                "id": agent_id,
                 "agent_id": agent_id,
                 "name": title,
                 "department": dept,

@@ -74,3 +74,8 @@ backups/
 .env*
 
 .runtime/
+
+# Projects runtime artifacts
+projects/*/reports/
+projects/*/exports/
+projects/serverless*

@@ -22,3 +22,9 @@
 
 ### [2026-11-15T22:27:45.604720+00:00] Steering Directive for @coordinator
 - Focus on high-intent Canadian leads
+
+### [2026-11-15T22:54:50.998190+00:00] Steering Directive for @coordinator
+- Focus on high-intent Canadian leads
+
+### [2026-11-15T22:55:16.432610+00:00] Steering Directive for @coordinator
+- Focus on high-intent Canadian leads
