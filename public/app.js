@@ -1,2047 +1,569 @@
-// ==========================================================================
-// AI Workforce OS — Control Center Client Application (Modern White & Blue)
-// Focus: Minimalist Home, Chat & Voice Prompting, Project-Task Assignment
-// ==========================================================================
-
-let currentTask = null;
-let activeTab = 'home';
-let activeSecSubTab = 'accounts';
-let cachedAccounts = [];
-let cachedAgents = [];
-let cachedTasks = [];
-let cachedProjects = [];
-let cachedConnectors = [];
-let selectedProjectId = 'proj-core-os';
-let selectedDepartment = 'all';
-
-// Voice Recognition State
-let speechRecognition = null;
-let isVoiceListening = false;
-let voiceUsedForCurrentPrompt = false;
-
-document.addEventListener('DOMContentLoaded', () => {
-    initVoiceRecognition();
-    initCommandPalette();
-    setupNavigation();
-    setupMobileDrawer();
-    setupChatShortcuts();
-
-    // Global Esc dismissal for all modal overlays
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
-        }
-    });
-
-    loadProjects();
-    loadConnectors();
-    loadTasks();
-    loadAgents();
-    loadSecurityAccounts();
-    loadSecurityHealth();
-    loadRequirements();
-    loadKnowledge();
-    loadGlobalEvents();
-    loadSystemNodes();
-    loadModelsData();
-
-    // Periodic live status polling (every 4s)
-    setInterval(() => {
-        if (activeTab === 'home') {
-            loadTasks(true);
-            loadProjects(true);
-        } else if (activeTab === 'tasks') {
-            loadTasks(true);
-            if (currentTask) refreshTaskDetail(currentTask.id);
-        } else if (activeTab === 'projects') {
-            loadProjects(true);
-        } else if (activeTab === 'connectors') {
-            loadConnectors(true);
-        } else if (activeTab === 'security') {
-            loadSecurityAccounts(true);
-            loadSecurityHealth();
-        } else if (activeTab === 'models') {
-            loadModelsData();
-        } else if (activeTab === 'events') {
-            loadGlobalEvents();
-        }
-        loadSystemNodes();
-    }, 4000);
-});
-
-// --- Web Speech API Voice Prompting Initialization ---
-
-function initVoiceRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        speechRecognition = new SpeechRecognition();
-        speechRecognition.continuous = true;
-        speechRecognition.interimResults = true;
-        speechRecognition.lang = 'en-US';
-
-        speechRecognition.onstart = () => {
-            isVoiceListening = true;
-            voiceUsedForCurrentPrompt = true;
-            updateVoiceUi(true);
-        };
-
-        speechRecognition.onresult = (event) => {
-            let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                finalTranscript += event.results[i][0].transcript;
-            }
-            const textarea = document.getElementById('chatPromptInput');
-            if (textarea && finalTranscript) {
-                textarea.value = finalTranscript;
-            }
-        };
-
-        speechRecognition.onerror = (event) => {
-            console.warn('Speech recognition error:', event.error);
-            isVoiceListening = false;
-            updateVoiceUi(false);
-        };
-
-        speechRecognition.onend = () => {
-            isVoiceListening = false;
-            updateVoiceUi(false);
-        };
-    }
-}
-
-window.toggleVoicePrompt = function() {
-    if (!speechRecognition) {
-        alert('Voice recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
-        return;
-    }
-
-    if (isVoiceListening) {
-        speechRecognition.stop();
-        isVoiceListening = false;
-        updateVoiceUi(false);
-    } else {
-        try {
-            speechRecognition.start();
-        } catch (e) {
-            console.warn('Voice start exception:', e);
-            speechRecognition.stop();
-        }
-    }
-};
-
-function updateVoiceUi(listening) {
-    const btn = document.getElementById('voicePromptBtn');
-    const textEl = document.getElementById('voiceBtnText');
-    const indicator = document.getElementById('voiceStatusIndicator');
-    const micIcon = document.getElementById('voiceMicIcon');
-
-    if (btn) btn.classList.toggle('listening', listening);
-    if (textEl) textEl.textContent = listening ? 'Stop Voice' : 'Voice Prompt';
-    if (micIcon) micIcon.textContent = listening ? '🔴' : '🎙️';
-    if (indicator) indicator.classList.toggle('active', listening);
-}
-
-function setupChatShortcuts() {
-    const textarea = document.getElementById('chatPromptInput');
-    if (textarea) {
-        textarea.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                window.handleChatSubmit();
-            }
-        });
-    }
-}
-
-// --- Navigation & Responsive Drawer ---
-
-function setupNavigation() {
-    const handleTabSwitch = (tabKey) => {
-        activeTab = tabKey;
-
-        // Sync Desktop & Mobile Sidebar
-        document.querySelectorAll('.nav-item').forEach(b => {
-            b.classList.toggle('active', b.dataset.tab === activeTab);
-        });
-
-        // Sync Mobile Bottom Nav
-        document.querySelectorAll('.mobile-nav-item').forEach(b => {
-            b.classList.toggle('active', b.dataset.tab === activeTab);
-        });
-
-        // Show Active Tab Pane
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        const targetPane = document.getElementById(`${activeTab}Tab`);
-        if (targetPane) targetPane.classList.add('active');
-
-        // Update Titles
-        const tabTitleMap = {
-            home: { title: 'Home & Command Console', sub: 'Voice & text autonomous prompting, active projects, and multi-agent execution' },
-            projects: { title: 'Projects & Workspaces', sub: 'Organize autonomous multi-agent workflows, goals, and deliverables by project' },
-            tasks: { title: 'Task Queue', sub: 'Cloud-queued tasks leased and executed by local Mac worker' },
-            agents: { title: '32 Agent Workforce', sub: 'Universal 3-file architecture: AGENT.md, SKILL.md, and MEMORY.md' },
-            workflows: { title: 'Workflow & DAG Canvas', sub: 'Interactive directed acyclic graph execution visualizer with parallel branching' },
-            connectors: { title: 'Agent Connectors & Tools', sub: 'Enable external tools, APIs, and authenticated sessions for the 32-agent workforce' },
-            security: { title: 'Sovereign Credentials Vault', sub: 'POSIX 0600 encrypted credentials with zero cloud leakage' },
-            models: { title: 'LLM & Model Management', sub: 'Multi-tier intelligent routing: Ollama ➔ Gemini / Claude ➔ Fallback' },
-            integrator: { title: 'System Integrator & Update Agent', sub: 'Scan, audit, and install new skills and tools' },
-            requirements: { title: 'Requirements & Change Engine', sub: 'Self-evolving operating system architecture change requests' },
-            events: { title: 'System Execution Audit Log', sub: 'Append-only immutable audit trail from execution_events' }
-        };
-
-        const currentMeta = tabTitleMap[activeTab] || { title: 'Control Center', sub: '' };
-        const titleEl = document.getElementById('currentTabTitle');
-        const subEl = document.getElementById('currentTabSubtitle');
-        if (titleEl) titleEl.textContent = currentMeta.title;
-        if (subEl) subEl.textContent = currentMeta.sub;
-
-        // Topbar Action Button Customization
-        const topBtn = document.getElementById('topbarActionBtn');
-        if (topBtn) {
-            if (activeTab === 'home' || activeTab === 'projects') {
-                topBtn.textContent = '+ Create Project';
-                topBtn.onclick = window.openNewProjectModal;
-            } else if (activeTab === 'security') {
-                topBtn.textContent = '+ Add Account';
-                topBtn.onclick = window.openNewAccountModal;
-            } else if (activeTab === 'workflows') {
-                topBtn.textContent = '▶ Simulate DAG';
-                topBtn.onclick = window.simulateDagRun;
-            } else {
-                topBtn.textContent = '+ Create Task';
-                topBtn.onclick = window.openNewTaskModal;
-            }
-        }
-
-        if (window.location.hash !== '#' + activeTab) {
-            history.replaceState(null, '', '#' + activeTab);
-        }
-
-        window.closeMobileSidebar();
-        window.refreshActiveTab();
-    };
-
-    window.addEventListener('hashchange', () => {
-        const hash = window.location.hash.replace('#', '');
-        if (hash && document.getElementById(`${hash}Tab`)) {
-            handleTabSwitch(hash);
-        }
-    });
-
-    const initHash = window.location.hash.replace('#', '');
-    if (initHash && document.getElementById(`${initHash}Tab`)) {
-        handleTabSwitch(initHash);
-    }
-
-    // Desktop & Drawer Nav Items
-    document.querySelectorAll('.nav-item').forEach(button => {
-        button.addEventListener('click', () => handleTabSwitch(button.dataset.tab));
-    });
-
-    // Mobile Bottom Nav Items
-    document.querySelectorAll('.mobile-nav-item').forEach(button => {
-        button.addEventListener('click', () => handleTabSwitch(button.dataset.tab));
-    });
-}
-
-function setupMobileDrawer() {
-    const toggleBtn = document.getElementById('mobileMenuToggle');
-    const sidebar = document.getElementById('appSidebar');
-    const backdrop = document.getElementById('sidebarBackdrop');
-
-    if (toggleBtn && sidebar && backdrop) {
-        toggleBtn.addEventListener('click', () => {
-            sidebar.classList.toggle('open');
-            backdrop.classList.toggle('active');
-        });
-    }
-}
-
-window.closeMobileSidebar = function() {
-    const sidebar = document.getElementById('appSidebar');
-    const backdrop = document.getElementById('sidebarBackdrop');
-    if (sidebar) sidebar.classList.remove('open');
-    if (backdrop) backdrop.classList.remove('active');
-};
-
-window.refreshActiveTab = function() {
-    if (activeTab === 'home') { loadProjects(); loadConnectors(); loadTasks(); }
-    else if (activeTab === 'projects') loadProjects();
-    else if (activeTab === 'connectors') loadConnectors();
-    else if (activeTab === 'tasks') loadTasks();
-    else if (activeTab === 'agents') loadAgents();
-    else if (activeTab === 'security') { loadSecurityAccounts(); loadSecurityHealth(); loadSecurityAuditLogs(); }
-    else if (activeTab === 'models') loadModelsData();
-    else if (activeTab === 'integrator') { loadAssets(); loadKnowledge(); }
-    else if (activeTab === 'requirements') loadRequirements();
-    else if (activeTab === 'events') loadGlobalEvents();
-};
-
-// --- Projects API & Workspace Management ---
-
-async function loadProjects(silent = false) {
-    try {
-        const res = await fetch('/api/projects');
-        const raw = await res.json();
-        cachedProjects = Array.isArray(raw) ? raw : [];
-
-        // Sync dropdown selectors
-        populateProjectDropdowns(cachedProjects);
-        renderHomeProjects(cachedProjects);
-        renderFullProjects(cachedProjects);
-    } catch (e) {
-        console.warn('Projects load deferred:', e);
-    }
-}
-
-function populateProjectDropdowns(projects) {
-    const chatSelect = document.getElementById('chatProjectSelect');
-    const taskSelect = document.getElementById('taskProjectInput');
-
-    const optionsHtml = projects.map(p => `
-        <option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>${p.name}</option>
-    `).join('') + `<option value="__new__">+ Create New Project...</option>`;
-
-    if (chatSelect) chatSelect.innerHTML = optionsHtml;
-    if (taskSelect) taskSelect.innerHTML = projects.map(p => `
-        <option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>${p.name}</option>
-    `).join('');
-}
-
-window.handleChatProjectChange = function(val) {
-    if (val === '__new__') {
-        window.openNewProjectModal();
-        if (cachedProjects.length) {
-            document.getElementById('chatProjectSelect').value = selectedProjectId;
-        }
-    } else {
-        selectedProjectId = val;
-    }
-};
-
-function renderHomeProjects(projects) {
-    const container = document.getElementById('homeProjectsGrid');
-    if (!container) return;
-
-    if (!projects.length) {
-        container.innerHTML = '<div class="empty-state">No projects created yet. Click "+ New Project" to get started.</div>';
-        return;
-    }
-
-    container.innerHTML = projects.map(p => {
-        // Compute project task statistics
-        const projTasks = cachedTasks.filter(t => (t.project_id === p.id) || (!t.project_id && p.id === 'proj-core-os'));
-        const total = projTasks.length;
-        const completed = projTasks.filter(t => t.status === 'completed').length;
-        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-        const isSelected = p.id === selectedProjectId;
-
-        return `
-            <div class="project-card ${isSelected ? 'active-project' : ''}" onclick="window.selectProjectCard('${p.id}')">
-                <div>
-                    <div class="project-card-header">
-                        <span class="project-name">${p.name}</span>
-                        <span class="tag" style="background:var(--bg-blue-subtle); color:var(--accent);">${p.category || 'general'}</span>
-                    </div>
-                    <p class="project-desc">${p.description || 'No description provided.'}</p>
-                </div>
-
-                <div>
-                    <div class="project-progress-wrap">
-                        <div class="project-progress-labels">
-                            <span>Progress</span>
-                            <span>${completed}/${total} Tasks (${pct}%)</span>
-                        </div>
-                        <div class="kpi-progress" style="margin:0;">
-                            <div class="kpi-progress-bar" style="width: ${pct}%;"></div>
-                        </div>
-                    </div>
-
-                    <div class="project-footer">
-                        <span style="font-size:11.5px; color:var(--text-muted);">Lead: <strong>${p.lead_agent_id || 'coordinator'}</strong></span>
-                        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); window.openAssignTaskToProject('${p.id}')">
-                            + Assign Task
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function renderFullProjects(projects) {
-    const container = document.getElementById('fullProjectsGrid');
-    if (!container) return;
-    renderHomeProjects(projects);
-}
-
-window.selectProjectCard = function(projectId) {
-    selectedProjectId = projectId;
-    const chatSelect = document.getElementById('chatProjectSelect');
-    if (chatSelect) chatSelect.value = projectId;
-
-    // Filter chat feed and tasks for this project
-    renderHomeProjects(cachedProjects);
-    renderChatFeedForProject(projectId);
-};
-
-window.openNewProjectModal = function() {
-    const modal = document.getElementById('newProjectModal');
-    if (modal) modal.style.display = 'flex';
-};
-
-window.closeNewProjectModal = function() {
-    const modal = document.getElementById('newProjectModal');
-    if (modal) modal.style.display = 'none';
-};
-
-window.handleCreateProject = async function(e) {
-    e.preventDefault();
-    const name = document.getElementById('projNameInput').value.trim();
-    const category = document.getElementById('projCategoryInput').value;
-    const leadAgent = document.getElementById('projLeadAgentInput').value;
-    const description = document.getElementById('projDescInput').value.trim();
-
-    try {
-        const res = await fetch('/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name,
-                category,
-                lead_agent_id: leadAgent,
-                description
-            })
-        });
-
-        if (!res.ok) throw new Error(await res.text());
-        const created = await res.json();
-        selectedProjectId = created.id;
-        window.closeNewProjectModal();
-        await loadProjects();
-    loadConnectors();
-
-        // Add notice to chat stream
-        appendChatMessage({
-            type: 'agent',
-            title: `📁 Project Workspace Created: ${created.name}`,
-            text: `Assigned lead agent **${created.lead_agent_id}** to coordinate goals for **${created.name}**. You can now dispatch tasks into this project via voice or text.`,
-            status: 'completed',
-            meta: `Project ID: ${created.id}`
-        });
-    } catch (err) {
-        alert('Failed creating project: ' + err.message);
-    }
-};
-
-window.openAssignTaskToProject = function(projectId) {
-    selectedProjectId = projectId;
-    const taskSelect = document.getElementById('taskProjectInput');
-    const modalTitle = document.getElementById('newTaskModalTitle');
-    const proj = cachedProjects.find(p => p.id === projectId);
-
-    if (taskSelect) taskSelect.value = projectId;
-    if (modalTitle && proj) modalTitle.textContent = `Assign Task to: ${proj.name}`;
-    window.openNewTaskModal();
-};
-
-// --- Chat & Voice Prompting Dispatch ---
-
-window.handleChatSubmit = async function() {
-    const input = document.getElementById('chatPromptInput');
-    const promptText = (input?.value || '').trim();
-    if (!promptText) return;
-
-    const projectId = document.getElementById('chatProjectSelect')?.value || selectedProjectId || 'proj-core-os';
-    const agentId = document.getElementById('chatAgentSelect')?.value || 'coordinator';
-    const priority = document.getElementById('chatPrioritySelect')?.value || 'medium';
-    const proj = cachedProjects.find(p => p.id === projectId);
-
-    // Stop voice recognition if active
-    if (isVoiceListening && speechRecognition) {
-        speechRecognition.stop();
-        isVoiceListening = false;
-        updateVoiceUi(false);
-    }
-
-    // Append owner message immediately to chat stream
-    appendChatMessage({
-        type: 'user',
-        text: promptText,
-        isVoice: voiceUsedForCurrentPrompt,
-        meta: `Project: ${proj ? proj.name : projectId} • Assigned: ${agentId} • Priority: ${priority.toUpperCase()}`
-    });
-
-    voiceUsedForCurrentPrompt = false;
-    if (input) input.value = '';
-
-    // Dispatch task via POST /api/tasks
-    try {
-        const res = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: promptText.slice(0, 75) + (promptText.length > 75 ? '...' : ''),
-                description: promptText,
-                assigned_agent_id: agentId,
-                target_agent: agentId,
-                project_id: projectId,
-                priority: priority,
-                input_payload: {
-                    project_id: projectId,
-                    privacy_level: 'standard'
-                }
-            })
-        });
-
-        if (!res.ok) throw new Error(await res.text());
-        const created = await res.json();
-
-        // Append Coordinator response to chat feed
-        appendChatMessage({
-            type: 'agent',
-            title: `⚡ [${agentId}] Task Queued & 5-Stage Loop Dispatched`,
-            text: `Objective received and leased by local MacBook Pro node. Executing 5-Stage Sovereign Agent Loop (*Run Policy ➔ Think ➔ Act ➔ Observe ➔ Deterministic Check*).`,
-            status: 'running',
-            meta: `Task ID: ${created.id} • Verification: Pending`,
-            taskId: created.id
-        });
-
-        await loadTasks();
-        await loadProjects();
-    loadConnectors();
-    } catch (err) {
-        appendChatMessage({
-            type: 'agent',
-            title: '⚠️ Dispatch Error',
-            text: `Failed to dispatch task to hybrid queue: ${err.message}`,
-            status: 'failed'
-        });
-    }
-};
-
-function appendChatMessage(msg) {
-    const stream = document.getElementById('homeChatStream');
-    if (!stream) return;
-
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    if (msg.type === 'user') {
-        const item = document.createElement('div');
-        item.className = 'chat-item';
-        item.innerHTML = `
-            <div class="chat-item-user">
-                <div class="chat-item-header">
-                    <span><strong>Owner Prompt</strong> ${msg.isVoice ? '<span class="tag" style="background:#eff6ff; color:#2563eb;">🎙️ Voice Input</span>' : ''}</span>
-                    <span>${timeStr}</span>
-                </div>
-                <div class="chat-item-text">${msg.text}</div>
-                <div style="font-size:11.5px; color:var(--text-muted); margin-top:8px;">${msg.meta}</div>
-            </div>
-        `;
-        stream.prepend(item);
-    } else {
-        const item = document.createElement('div');
-        item.className = 'chat-item';
-        item.innerHTML = `
-            <div class="chat-item-agent">
-                <div class="chat-item-header">
-                    <span><strong style="color:var(--accent);">${msg.title}</strong></span>
-                    <span class="tag status-${msg.status}">${msg.status.toUpperCase()}</span>
-                </div>
-                <div class="chat-item-text" style="font-size:13.5px; color:var(--text-secondary);">${msg.text}</div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:11.5px; color:var(--text-muted);">
-                    <span>${msg.meta || ''}</span>
-                    ${msg.taskId ? `<button class="btn btn-secondary btn-sm" onclick="window.selectTask('${msg.taskId}')">Inspect Execution →</button>` : ''}
-                </div>
-            </div>
-        `;
-        stream.prepend(item);
-    }
-}
-
-function renderChatFeedForProject(projectId) {
-    const stream = document.getElementById('homeChatStream');
-    if (!stream) return;
-
-    // Filter tasks for this project
-    const projTasks = cachedTasks.filter(t => (t.project_id === projectId) || (!t.project_id && projectId === 'proj-core-os'));
-    stream.innerHTML = '';
-
-    if (!projTasks.length) {
-        stream.innerHTML = '<div class="empty-state">No chat commands or tasks dispatched in this project yet. Use the prompt box above to begin.</div>';
-        return;
-    }
-
-    projTasks.slice(0, 5).forEach(t => {
-        appendChatMessage({
-            type: 'agent',
-            title: `⚡ [${t.assigned_agent_id || 'coordinator'}] ${t.title}`,
-            text: t.description || 'Autonomous step execution complete.',
-            status: t.status || 'completed',
-            meta: `Task ID: ${t.id} • Verified: ${t.verification_status || 'passed'}`,
-            taskId: t.id
-        });
-    });
-}
-
-// --- System Nodes & Hardware Status ---
-
-async function loadSystemNodes() {
-    try {
-        const res = await fetch('/api/nodes');
-        const data = await res.json();
-        const nodes = Array.isArray(data) ? data : (data.nodes || []);
-        const primaryNode = nodes.find(n => n.node_id === 'macbook-pro-primary') || nodes[0];
-
-        const widgetNameEl = document.getElementById('widgetNodeName');
-        if (primaryNode && widgetNameEl) {
-            widgetNameEl.textContent = primaryNode.node_id || 'macbook-pro';
-        }
-    } catch (e) {
-        console.warn('Node check deferred:', e);
-    }
-}
-
-// --- Task Queue & Detail Inspector ---
-
-async function loadTasks(silent = false) {
-    try {
-        const res = await fetch('/api/tasks');
-        const raw = await res.json();
-        cachedTasks = Array.isArray(raw) ? raw : (raw.tasks || []);
-        renderExecutiveHud();
-        const container = document.getElementById('taskListContainer');
-        const badge = document.getElementById('taskCountBadge');
-        if (badge) badge.textContent = `${cachedTasks.length} tasks`;
-
-        // Also refresh chat feed on home if empty
-        const stream = document.getElementById('homeChatStream');
-        if (stream && (!stream.children.length || stream.querySelector('.empty-state'))) {
-            renderChatFeedForProject(selectedProjectId);
-        }
-
-        if (!cachedTasks.length) {
-            if (container) container.innerHTML = '<div class="empty-state">No tasks created yet. Click "+ Create Task" to begin.</div>';
-            return;
-        }
-
-        if (container) {
-            container.innerHTML = cachedTasks.map(t => {
-                const statusUpper = (t.status || 'pending').toUpperCase();
-                const priorityUpper = (t.priority || 'medium').toUpperCase();
-                const priClass = `priority-${(t.priority || 'medium').toLowerCase()}`;
-                const proj = cachedProjects.find(p => p.id === t.project_id);
-                return `
-                <div class="task-card ${currentTask && currentTask.id === t.id ? 'active' : ''}" onclick="window.selectTask('${t.id}')">
-                    <div class="task-card-header">
-                        <span class="task-card-title">${t.title}</span>
-                        <span class="tag status-${t.status || 'pending'}">${statusUpper}</span>
-                    </div>
-                    <div class="task-meta">
-                        <span class="tag ${priClass}">${priorityUpper}</span>
-                        <span>Project: <strong>${proj ? proj.name.split(' ')[0] : 'Core'}</strong></span>
-                        <span>Agent: <strong>${t.assigned_agent_id || 'coordinator'}</strong></span>
-                    </div>
-                </div>
-                `;
-            }).join('');
-        }
-
-        if (!currentTask && cachedTasks.length && !silent) {
-            window.selectTask(cachedTasks[0].id);
-        }
-    } catch (e) {
-        console.error('Failed loading tasks:', e);
-    }
-}
-
-window.selectTask = async function(taskId) {
-    try {
-        const res = await fetch(`/api/tasks/${taskId}`);
-        currentTask = await res.json();
-        renderTaskDetail(currentTask);
-
-        // Switch to Tasks tab if invoked from Home
-        if (activeTab === 'home') {
-            document.querySelector('.nav-item[data-tab="tasks"]')?.click();
-        }
-
-        document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
-        const activeCard = Array.from(document.querySelectorAll('.task-card')).find(c => c.textContent.includes(currentTask.title));
-        if (activeCard) activeCard.classList.add('active');
-
-        // Mobile responsiveness
-        if (window.innerWidth < 1024) {
-            const listPanel = document.getElementById('taskListPanel');
-            const detailPanel = document.getElementById('taskDetailPanel');
-            if (listPanel && detailPanel) {
-                listPanel.style.display = 'none';
-                detailPanel.style.display = 'flex';
-            }
-        }
-    } catch (e) {
-        console.error('Failed selecting task:', e);
-    }
-};
-
-window.showTaskListOnMobile = function() {
-    const listPanel = document.getElementById('taskListPanel');
-    const detailPanel = document.getElementById('taskDetailPanel');
-    if (listPanel && detailPanel) {
-        listPanel.style.display = 'flex';
-        detailPanel.style.display = 'none';
-    }
-};
-
-async function refreshTaskDetail(taskId) {
-    try {
-        const res = await fetch(`/api/tasks/${taskId}`);
-        currentTask = await res.json();
-        renderTaskDetail(currentTask);
-    } catch (e) {
-        console.error('Failed refreshing task detail:', e);
-    }
-}
-
-function renderTaskDetail(task) {
-    const container = document.getElementById('taskDetailContainer');
-    const badges = document.getElementById('taskStatusBadges');
-    if (!container) return;
-
-    if (badges) {
-        badges.innerHTML = `
-            <span class="tag status-${task.status || 'pending'}">${(task.status || 'pending').toUpperCase()}</span>
-            <span class="tag status-completed">Verified: ${(task.verification_status || 'passed').toUpperCase()}</span>
-        `;
-    }
-
-    const isCompleted = task.status === 'completed';
-    const isRunning = task.status === 'claimed' || task.status === 'running';
-
-    const loopTrackerHtml = `
-        <div class="loop-pipeline-tracker">
-            <div class="loop-pipeline-header">
-                <span class="loop-pipeline-title">5-Stage Sovereign Agent Execution Loop</span>
-                <span class="badge ${isCompleted ? 'online' : (isRunning ? 'status-running' : 'offline')}">
-                    ${isCompleted ? 'All Stages Passed' : (isRunning ? 'Loop Executing' : 'Queued')}
-                </span>
-            </div>
-            <div class="loop-stages-row">
-                <div class="loop-stage-card ${isCompleted ? 'passed' : (isRunning ? 'active' : '')}">
-                    <div class="loop-stage-num">Stage 1</div>
-                    <div class="loop-stage-name">Run Policy</div>
-                    <div class="loop-stage-meta">${isCompleted ? '✓ Context & Auth OK' : 'Auth & Policy Check'}</div>
-                </div>
-                <div class="loop-stage-card ${isCompleted ? 'passed' : (isRunning ? 'active' : '')}">
-                    <div class="loop-stage-num">Stage 2</div>
-                    <div class="loop-stage-name">Think</div>
-                    <div class="loop-stage-meta">${isCompleted ? '✓ Model Synthesis' : 'Model Reasoning'}</div>
-                </div>
-                <div class="loop-stage-card ${isCompleted ? 'passed' : (isRunning ? 'active' : '')}">
-                    <div class="loop-stage-num">Stage 3</div>
-                    <div class="loop-stage-name">Act</div>
-                    <div class="loop-stage-meta">${isCompleted ? '✓ Tool Dispatched' : 'Runtime Adapters'}</div>
-                </div>
-                <div class="loop-stage-card ${isCompleted ? 'passed' : (isRunning ? 'active' : '')}">
-                    <div class="loop-stage-num">Stage 4</div>
-                    <div class="loop-stage-name">Observe</div>
-                    <div class="loop-stage-meta">${isCompleted ? '✓ Telemetry Logged' : 'Capture Observations'}</div>
-                </div>
-                <div class="loop-stage-card ${isCompleted ? 'passed' : ''}">
-                    <div class="loop-stage-num">Stage 5</div>
-                    <div class="loop-stage-name">Code Check</div>
-                    <div class="loop-stage-meta">${isCompleted ? '✓ 6/6 Deterministic' : 'AST & Schema Verify'}</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    let planHtml = `
-        <div class="panel" style="padding:16px; margin-bottom:16px;">
-            <div class="panel-header" style="border:none; padding:0 0 10px 0;">
-                <h3>Task Objective & Context</h3>
-            </div>
-            <p style="color:var(--text-secondary); font-size:13.5px; line-height:1.5;">${task.description || 'No detailed instructions provided.'}</p>
-            <div class="task-meta" style="margin-top:12px;">
-                <span>ID: <code>${task.id}</code></span>
-                <span>Agent: <strong>${task.assigned_agent_id || 'coordinator'}</strong></span>
-                <span>Priority: <strong>${(task.priority || 'medium').toUpperCase()}</strong></span>
-            </div>
-        </div>
-    `;
-
-    let outputHtml = '';
-    if (task.output_result) {
-        const out = task.output_result;
-        outputHtml = `
-            <div class="panel" style="padding:16px; margin-top:16px; border-left:4px solid var(--accent);">
-                <div class="panel-header" style="border:none; padding:0 0 10px 0;">
-                    <h3>Verified Deliverable & Evidence</h3>
-                </div>
-                ${out.summary ? `<p style="margin-bottom:10px; color:var(--text-secondary); font-size:13.5px;">${out.summary}</p>` : ''}
-                ${out.artifact_path ? `<div style="font-size:12px; margin-bottom:8px;">Artifact: <code style="color:var(--accent);">${out.artifact_path}</code></div>` : ''}
-                ${out.content ? `<pre style="font-size:12px; background:var(--bg-subtle); padding:12px; border-radius:var(--radius-md); overflow-x:auto; font-family:var(--font-mono);">${out.content}</pre>` : ''}
-            </div>
-        `;
-    }
-
-    container.innerHTML = loopTrackerHtml + planHtml + outputHtml;
-}
-
-// --- Task Creation Modal Handlers ---
-
-window.openNewTaskModal = function() {
-    const modal = document.getElementById('newTaskModal');
-    if (modal) modal.style.display = 'flex';
-};
-
-window.closeNewTaskModal = function() {
-    const modal = document.getElementById('newTaskModal');
-    if (modal) modal.style.display = 'none';
-};
-
-window.handleCreateTask = async function(e) {
-    e.preventDefault();
-    const title = document.getElementById('taskTitleInput').value.trim();
-    const agent = document.getElementById('taskAgentInput').value;
-    const priority = document.getElementById('taskPriorityInput').value;
-    const description = document.getElementById('taskDescInput').value.trim();
-    const projectId = document.getElementById('taskProjectInput').value || selectedProjectId;
-
-    try {
-        const res = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title,
-                description,
-                assigned_agent_id: agent,
-                target_agent: agent,
-                project_id: projectId,
-                priority,
-                input_payload: { project_id: projectId, privacy_level: 'standard' }
-            })
-        });
-
-        if (!res.ok) throw new Error(await res.text());
-        const created = await res.json();
-        window.closeNewTaskModal();
-        await loadTasks();
-        await loadProjects();
-    loadConnectors();
-        if (created && created.id) window.selectTask(created.id);
-    } catch (err) {
-        alert('Failed to dispatch task: ' + err.message);
-    }
-};
-
-// --- Agent Blueprints & 32-Agent Workforce ---
-
-async function loadAgents() {
-    try {
-        const res = await fetch('/api/agents');
-        const raw = await res.json();
-        cachedAgents = Array.isArray(raw) ? raw : (raw.agents || []);
-        renderAgentsGrid(cachedAgents);
-    } catch (e) {
-        console.error('Failed loading agents:', e);
-    }
-}
-
-function renderAgentsGrid(agents) {
-    const container = document.getElementById('agentsGridContainer') || document.getElementById('agentGridContainer');
-    if (!container) return;
-
-    if (!agents.length) {
-        container.innerHTML = '<div class="empty-state">No agent blueprints registered in OS.</div>';
-        return;
-    }
-
-    container.innerHTML = agents.map(a => {
-        const specialists = Array.isArray(a.specialists) ? a.specialists : [];
-        const defaultModel = typeof a.default_model === 'object' && a.default_model !== null
-            ? (a.default_model.name || 'default')
-            : (a.default_model || 'default');
-        const caps = Array.isArray(a.capabilities) ? a.capabilities : [];
-
-        return `
-        <div class="agent-card">
-            <div>
-                <div class="agent-card-header">
-                    <div>
-                        <span class="agent-dept">${a.department || 'Operations'}</span>
-                        <h3 class="agent-card-title">${a.name || a.id}</h3>
-                    </div>
-                    <span class="tag status-completed">v${a.version || '2.0.0'}</span>
-                </div>
-                <p class="agent-description">${a.description || ''}</p>
-                
-                <div class="specialist-list">
-                    <strong>Specialized Subagents (${specialists.length}):</strong>
-                    ${specialists.map(s => `
-                        <div class="specialist-item">
-                            • <strong>${s.name || s.id}</strong>: ${s.specialization || (s.skills ? s.skills.join(', ') : '')}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-
-            <div class="task-meta" style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
-                <span>Default Model: <code>${defaultModel}</code></span>
-                <span>Capabilities: <strong>${caps.length}</strong></span>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="window.openAgentBlueprints('${a.id}')" style="margin-top:10px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <svg class="lucide-icon sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                <span>Inspect Blueprints (AGENT / SKILL / MEMORY)</span>
-            </button>
-        </div>
-        `;
-    }).join('');
-}
-
-window.filterAgents = function() {
-    const q = (document.getElementById('agentSearchInput')?.value || '').toLowerCase();
-    let filtered = cachedAgents;
-
-    if (selectedDepartment !== 'all') {
-        filtered = filtered.filter(a => a.department === selectedDepartment);
-    }
-
-    if (q) {
-        filtered = filtered.filter(a => {
-            const matchName = (a.name || '').toLowerCase().includes(q);
-            const matchDept = (a.department || '').toLowerCase().includes(q);
-            const matchDesc = (a.description || '').toLowerCase().includes(q);
-            const matchSpec = (a.specialists || []).some(s => (s.name || '').toLowerCase().includes(q) || (s.specialization || '').toLowerCase().includes(q));
-            return matchName || matchDept || matchDesc || matchSpec;
-        });
-    }
-
-    renderAgentsGrid(filtered);
-};
-
-window.filterAgentsByDept = function(dept) {
-    selectedDepartment = dept;
-    document.querySelectorAll('#agentDepartmentPills .pill-filter').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.includes(dept === 'all' ? 'All' : dept.split(' ')[0]));
-    });
-    window.filterAgents();
-};
-
-// --- Interactive Workflow & DAG Simulation ---
-
-window.simulateDagRun = function() {
-    const stageIds = ['dagNodeGoal', 'dagNodeCoord', 'dagNodeAlloc', 'dagNodeLoop', 'dagNodeSoftware', 'dagNodeBrowser', 'dagNodeResearch', 'dagNodeVerifier', 'dagNodeReport'];
-    
-    stageIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.remove('active-stage');
-    });
-
-    let index = 0;
-    const interval = setInterval(() => {
-        if (index > 0) {
-            const prev = document.getElementById(stageIds[index - 1]);
-            if (prev) prev.classList.remove('active-stage');
-        }
-
-        if (index < stageIds.length) {
-            const current = document.getElementById(stageIds[index]);
-            if (current) {
-                current.classList.add('active-stage');
-                current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-            index++;
-        } else {
-            clearInterval(interval);
-            const finalNode = document.getElementById('dagNodeReport');
-            if (finalNode) finalNode.classList.add('active-stage');
-        }
-    }, 500);
-};
-
-// --- Security & Credentials Vault ---
-
-async function loadSecurityAccounts(silent = false) {
-    try {
-        const res = await fetch('/api/security/accounts');
-        const raw = await res.json();
-        cachedAccounts = Array.isArray(raw) ? raw : (raw.accounts || []);
-        renderAccountsGrid(cachedAccounts);
-    } catch (e) {
-        console.error('Failed loading security accounts:', e);
-    }
-}
-
-function renderAccountsGrid(accounts) {
-    const container = document.getElementById('accountsGridContainer');
-    if (!container) return;
-
-    if (!accounts.length) {
-        container.innerHTML = '<div class="empty-state">No accounts registered in vault yet. Click "+ Add Account" to store credentials securely.</div>';
-        return;
-    }
-
-    container.innerHTML = accounts.map(a => {
-        const authorizedPills = (a.authorized_agents || []).map(ag => `<span class="agent-badge">${ag.agent_id} (${ag.permission_level})</span>`).join('');
-        return `
-            <div class="account-card">
-                <div class="account-header">
-                    <div>
-                        <span class="tag" style="margin-right:6px;">${(a.category || 'tool').toUpperCase()}</span>
-                        <strong class="account-title">${a.name}</strong>
-                    </div>
-                    <span class="badge ${a.health_status === 'HEALTHY' ? 'online' : 'offline'}">${a.health_status || 'HEALTHY'}</span>
-                </div>
-                <div class="account-meta">
-                    <div>User / Email: <code>${a.username_or_email}</code></div>
-                    <div>Service: <a href="${a.url}" target="_blank" style="color:var(--accent); text-decoration:none;">${a.url}</a></div>
-                    <div>MFA: <strong>${a.mfa_status || 'ENABLED'}</strong> | Secret: <span style="font-family:var(--font-mono); color:var(--text-muted);">•••••••••••• (POSIX 0600)</span></div>
-                    <div style="margin-top:6px;">Authorized Agents:</div>
-                    <div class="agent-badges">${authorizedPills || '<span style="color:#64748b; font-size:11px;">Restricted</span>'}</div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-async function loadSecurityHealth() {
-    try {
-        const res = await fetch('/api/security/health');
-        const data = await res.json();
-        const statEl = document.getElementById('statTotalAccounts');
-        if (statEl) statEl.textContent = data.total_accounts || 3;
-    } catch (e) {
-        console.warn('Security health check deferred:', e);
-    }
-}
-
-async function loadSecurityAuditLogs() {
-    try {
-        const res = await fetch('/api/security/audit');
-        const logs = await res.json();
-        const container = document.getElementById('securityAuditLogContainer');
-        if (container && Array.isArray(logs)) {
-            container.innerHTML = logs.map(l => `
-                <div class="step-card" style="padding:10px 14px;">
-                    <div style="display:flex; justify-content:space-between; font-size:12px;">
-                        <span><strong>${l.action}</strong> by <code>${l.actor_id}</code></span>
-                        <span class="tag status-completed">${l.status}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-    } catch (e) {
-        console.warn('Security audit check deferred:', e);
-    }
-}
-
-window.switchSecuritySubTab = function(subTab) {
-    activeSecSubTab = subTab;
-    document.querySelectorAll('#securityTab .pill-filter').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.sec-sub-pane').forEach(p => p.style.display = 'none');
-
-    const targetBtn = document.getElementById(`secSubBtn${subTab.charAt(0).toUpperCase() + subTab.slice(1)}`);
-    const targetPane = document.getElementById(`secSub${subTab.charAt(0).toUpperCase() + subTab.slice(1)}`);
-    if (targetBtn) targetBtn.classList.add('active');
-    if (targetPane) targetPane.style.display = 'block';
-
-    if (subTab === 'audit') loadSecurityAuditLogs();
-};
-
-window.openNewAccountModal = function() {
-    const modal = document.getElementById('newAccountModal');
-    if (modal) modal.style.display = 'flex';
-};
-
-window.closeNewAccountModal = function() {
-    const modal = document.getElementById('newAccountModal');
-    if (modal) modal.style.display = 'none';
-};
-
-window.handleCreateAccount = async function(e) {
-    e.preventDefault();
-    alert('Account stored securely in local Mac hardware vault (POSIX 0600).');
-    window.closeNewAccountModal();
-};
-
-// --- Models & Inference API ---
-
-async function loadModelsData() {
-    try {
-        const [statusRes, provRes, modelsRes] = await Promise.all([
-            fetch('/api/models/status'),
-            fetch('/api/models/providers'),
-            fetch('/api/models')
-        ]);
-
-        const status = await statusRes.json();
-        const provs = await provRes.json();
-        const models = await modelsRes.json();
-
-        const modelLabel = document.getElementById('activeModelLabel');
-        if (modelLabel) modelLabel.textContent = status.default_model || 'gemini-2.5-flash';
-
-        const provGrid = document.getElementById('providerGridContainer');
-        if (provGrid && Array.isArray(provs)) {
-            provGrid.innerHTML = provs.map(p => `
-                <div class="agent-card">
-                    <div class="agent-card-header">
-                        <h3 class="agent-card-title">${p.name}</h3>
-                        <span class="badge ${p.health_status === 'healthy' ? 'online' : 'offline'}">${p.health_status}</span>
-                    </div>
-                    <p class="agent-description">Provider Type: <code>${p.provider_type}</code></p>
-                    <div class="task-meta">
-                        <span>Classification: <strong>${p.provider_type.includes('local') ? 'Local Sovereign' : 'Cloud Hybrid'}</strong></span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        const modelGrid = document.getElementById('modelsGridContainer');
-        if (modelGrid && Array.isArray(models)) {
-            modelGrid.innerHTML = models.map(m => `
-                <div class="agent-card">
-                    <div class="agent-card-header">
-                        <h3 class="agent-card-title">${m.display_name}</h3>
-                        <span class="tag ${m.is_default ? 'status-completed' : 'priority-medium'}">${m.is_default ? 'DEFAULT' : m.classification.toUpperCase()}</span>
-                    </div>
-                    <p class="agent-description">ID: <code>${m.id}</code> | Provider: <strong>${m.provider_id}</strong></p>
-                    <div class="task-meta">
-                        <span>Tier: <strong>${m.classification === 'local' ? 'Offline Sovereign' : 'Cloud High-Throughput'}</strong></span>
-                    </div>
-                </div>
-            `).join('');
-        }
-    } catch (e) {
-        console.warn('Models check deferred:', e);
-    }
-}
-
-// --- Integrator, Requirements & Events ---
-
-async function loadAssets() {}
-
-async function loadKnowledge() {
-    window.showKnowledgeDoc('INSTALLED_ASSETS.md');
-}
-
-window.showKnowledgeDoc = async function(docName) {
-    const area = document.getElementById('docContentArea');
-    if (area) {
-        area.innerHTML = `<pre>Active Operational Registry: ${docName}\nStatus: SYNCHRONIZED\nTotal Agents: 32 (8 Core + 24 Specialists)\nSecurity: 0 Secrets in Cloud\nExecution Nodes: 1 (macbook-pro-primary Online)</pre>`;
-    }
-};
-
-window.scanIncomingAssets = function() {
-    alert('Scan complete. 0 pending unreviewed assets in incoming queue.');
-};
-
-async function loadRequirements() {
-    const list = document.getElementById('requirementsListContainer');
-    if (list) {
-        list.innerHTML = '<div class="empty-state">All 32 core agents and 24 specialists fully implemented and verified.</div>';
-    }
-}
-
-window.submitRequirement = function(e) {
-    e.preventDefault();
-    alert('Requirement evaluated. Change proposed and recorded.');
-};
-
-async function loadGlobalEvents() {
-    try {
-        const res = await fetch('/api/tasks');
-        const tasks = await res.json();
-        const container = document.getElementById('globalEventStreamContainer');
-        if (container && Array.isArray(tasks)) {
-            container.innerHTML = tasks.slice(0, 10).map(t => `
-                <div class="step-card" style="padding:12px 16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <strong>Task Event: ${t.title}</strong>
-                        <span class="tag status-${t.status || 'pending'}">${(t.status || 'pending').toUpperCase()}</span>
-                    </div>
-                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
-                        Assigned Agent: <code>${t.assigned_agent_id || 'coordinator'}</code> | Task ID: <code>${t.id}</code>
-                    </div>
-                </div>
-            `).join('');
-        }
-    } catch (e) {
-        console.warn('Events check deferred:', e);
-    }
-}
-
-
-// ==========================================================================
-// FounderOS-Inspired Executive HUD, Command Palette & Forcespace Filter
-// ==========================================================================
-
-// --- 1. Executive HUD: Needs You & Done Today ---
-
-function renderExecutiveHud() {
-    renderNeedsYouHud();
-    renderDoneTodayHud();
-    renderExecutiveTelemetry();
-}
-
-function renderNeedsYouHud() {
-    const listEl = document.getElementById('needsYouList');
-    const badgeEl = document.getElementById('needsYouCountPill');
-    if (!listEl) return;
-
-    // Filter tasks blocked or waiting on operator
-    const blockedTasks = cachedTasks.filter(t => 
-        t.status === 'blocked' || 
-        t.status === 'waiting_approval' || 
-        t.status === 'needs_review' ||
-        t.status === 'failed'
-    );
-
-    if (badgeEl) {
-        badgeEl.textContent = `${blockedTasks.length} ${blockedTasks.length === 1 ? 'item' : 'items'}`;
-        badgeEl.className = blockedTasks.length > 0 ? 'hud-badge warn' : 'hud-badge neutral';
-    }
-
-    if (!blockedTasks.length) {
-        listEl.innerHTML = `
-            <li class="hud-empty-state">
-                <span style="color:var(--success); font-weight:600;">✓ Autonomous Flow Nominal</span>
-                <div style="font-size:11.5px; margin-top:2px;">No tasks blocked or awaiting operator intervention.</div>
-            </li>
-        `;
-        return;
-    }
-
-    listEl.innerHTML = blockedTasks.slice(0, 5).map(t => {
-        const age = formatRelativeTime(t.updated_at || t.created_at);
-        return `
-            <li class="hud-item" onclick="window.selectTaskAndOpen('${t.id}')" title="Click to inspect and unblock">
-                <div class="hud-item-left" style="display:flex; align-items:center; min-width:0;">
-                    <span class="beacon-pulse" style="background:${t.status === 'failed' ? 'var(--danger)' : 'var(--warning)'}; margin-right:8px; flex-shrink:0;"></span>
-                    <span class="hud-item-title">${escapeHtml(t.title)}</span>
-                </div>
-                <div class="hud-item-meta">
-                    <span class="tag" style="font-size:10px; padding:1px 6px;">${t.assigned_agent_id || 'coordinator'}</span>
-                    <span>${age}</span>
-                    <span style="color:var(--accent); font-weight:600;">Resolve →</span>
-                </div>
-            </li>
-        `;
-    }).join('');
-}
-
-function renderDoneTodayHud() {
-    const listEl = document.getElementById('doneTodayList');
-    const badgeEl = document.getElementById('doneTodayCountPill');
-    if (!listEl) return;
-
-    // Filter completed tasks
-    const completedTasks = cachedTasks.filter(t => t.status === 'completed' || t.status === 'done');
-
-    if (badgeEl) {
-        badgeEl.textContent = `${completedTasks.length} completed`;
-        badgeEl.className = 'hud-badge success';
-    }
-
-    if (!completedTasks.length) {
-        listEl.innerHTML = `
-            <li class="hud-empty-state">
-                <span>No tasks completed yet today.</span>
-                <div style="font-size:11.5px; margin-top:2px;">Dispatch a goal above to start multi-agent execution.</div>
-            </li>
-        `;
-        return;
-    }
-
-    listEl.innerHTML = completedTasks.slice(0, 5).map(t => {
-        const age = formatRelativeTime(t.updated_at || t.created_at);
-        const verified = t.verification_status === 'verified' || t.verification_status === 'deterministic_pass';
-        return `
-            <li class="hud-item" onclick="window.selectTaskAndOpen('${t.id}')">
-                <div class="hud-item-left" style="display:flex; align-items:center; min-width:0;">
-                    <span style="color:var(--success); font-size:14px; margin-right:8px; flex-shrink:0;">✓</span>
-                    <span class="hud-item-title">${escapeHtml(t.title)}</span>
-                </div>
-                <div class="hud-item-meta">
-                    <span class="tag" style="background:var(--bg-blue-subtle); color:var(--accent); font-size:10px; padding:1px 6px;">${t.assigned_agent_id || 'coordinator'}</span>
-                    ${verified ? '<span class="tag" style="background:var(--success-bg); color:var(--success); font-size:9.5px; padding:1px 4px;">Verified</span>' : ''}
-                    <span>${age}</span>
-                </div>
-            </li>
-        `;
-    }).join('');
-}
-
-function renderExecutiveTelemetry() {
-    // 1. Health Score Calculation
-    const blockedCount = cachedTasks.filter(t => t.status === 'blocked' || t.status === 'failed').length;
-    const totalCount = Math.max(1, cachedTasks.length);
-    const passRatio = Math.max(0.85, 1 - (blockedCount / totalCount));
-    const scorePct = Math.round(passRatio * 100);
-
-    const scoreEl = document.getElementById('hudHealthScore');
-    const arcEl = document.getElementById('hudHealthArc');
-    if (scoreEl) scoreEl.textContent = `${scorePct}%`;
-    if (arcEl) {
-        const offset = 260 - (260 * (scorePct / 100));
-        arcEl.style.strokeDashoffset = `${offset}`;
-    }
-
-    // 2. Dotted row values
-    const queueValEl = document.getElementById('hudQueueVal');
-    if (queueValEl) {
-        queueValEl.textContent = `${cachedTasks.length} queued / active`;
-    }
-    const workforceValEl = document.getElementById('hudWorkforceVal');
-    if (workforceValEl) {
-        workforceValEl.textContent = `${cachedAgents.length || 32} Blueprints Ready`;
-    }
-
-    // 3. Dot-Matrix 7-Day Activity Matrix
-    const matrixSvg = document.getElementById('executiveMatrixSvg');
-    if (matrixSvg) {
-        const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-        const cols = 7;
-        const rows = 4;
-        let svgContent = '';
-        const taskCount = cachedTasks.length;
-        
-        for (let c = 0; c < cols; c++) {
-            const x = c * 15 + 6;
-            const litCount = (c === 6) ? Math.min(rows, Math.max(2, Math.floor(taskCount / 2))) : Math.min(rows, (c % 3) + 1);
-            
-            for (let r = 0; r < rows; r++) {
-                const y = (rows - 1 - r) * 11 + 8;
-                const isLit = r < litCount;
-                const color = isLit ? 'var(--accent)' : '#e2e8f0';
-                svgContent += `<circle cx="${x}" cy="${y}" r="3.2" fill="${color}" />`;
-            }
-            svgContent += `<text x="${x}" y="52" text-anchor="middle" font-size="8" fill="#94a3b8">${days[c]}</text>`;
-        }
-        matrixSvg.innerHTML = svgContent;
-    }
-}
-
-// --- 2. Global Command Palette (Cmd+K) ---
-
-let paletteSelectedIndex = 0;
-let paletteCurrentResults = [];
-
-function initCommandPalette() {
-    window.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            window.toggleCommandPalette();
-        } else if (e.key === 'Escape') {
-            window.closeCommandPalette();
-        }
-    });
-
-    const input = document.getElementById('paletteSearchInput');
-    if (input) {
-        input.addEventListener('input', (e) => {
-            renderPaletteResults(e.target.value);
-        });
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                paletteSelectedIndex = Math.min(paletteSelectedIndex + 1, paletteCurrentResults.length - 1);
-                updatePaletteHighlight();
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                paletteSelectedIndex = Math.max(0, paletteSelectedIndex - 1);
-                updatePaletteHighlight();
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                executePaletteSelection();
-            }
-        });
-    }
-}
-
-window.openCommandPalette = function() {
-    const modal = document.getElementById('commandPaletteModal');
-    const input = document.getElementById('paletteSearchInput');
-    if (modal) {
-        modal.classList.add('active');
-        if (input) {
-            input.value = '';
-            input.focus();
-            renderPaletteResults('');
-        }
-    }
-};
-
-window.closeCommandPalette = function() {
-    const modal = document.getElementById('commandPaletteModal');
-    if (modal) modal.classList.remove('active');
-};
-
-window.toggleCommandPalette = function() {
-    const modal = document.getElementById('commandPaletteModal');
-    if (modal && modal.classList.contains('active')) {
-        window.closeCommandPalette();
-    } else {
-        window.openCommandPalette();
-    }
-};
-
-window.handlePaletteBackdropClick = function(e) {
-    if (e.target && e.target.id === 'commandPaletteModal') {
-        window.closeCommandPalette();
-    }
-};
-
-function renderPaletteResults(query) {
-    const listEl = document.getElementById('paletteResultsList');
-    if (!listEl) return;
-    const q = (query || '').toLowerCase().trim();
-
-    paletteCurrentResults = [];
-
-    // 1. Navigation items
-    const navItems = [
-        { type: 'view', id: 'home', title: 'Home & Command Console', icon: '💬', shortcut: 'View' },
-        { type: 'view', id: 'projects', title: 'Projects & Workspaces', icon: '📁', shortcut: 'View' },
-        { type: 'view', id: 'tasks', title: 'Task Queue & Logs', icon: '📋', shortcut: 'View' },
-        { type: 'view', id: 'agents', title: '32 Agent Workforce Directory', icon: '🤖', shortcut: 'View' },
-        { type: 'view', id: 'workflows', title: 'Workflow DAG Visualizer', icon: '⚡', shortcut: 'View' },
-        { type: 'view', id: 'security', title: 'Sovereign Credentials Vault', icon: '🔒', shortcut: 'View' },
-        { type: 'view', id: 'models', title: 'LLM Model Management', icon: '🧠', shortcut: 'View' },
-        { type: 'view', id: 'integrator', title: 'System Integrator & Assets', icon: '🧩', shortcut: 'View' }
-    ];
-
-    // 2. Quick Actions
-    const actionItems = [
-        { type: 'action', action: 'new_project', title: 'Create New Project Workspace', icon: '➕', shortcut: 'Action' },
-        { type: 'action', action: 'voice_prompt', title: 'Start Voice Prompt Dictation', icon: '🎙️', shortcut: 'Action' },
-        { type: 'action', action: 'refresh', title: 'Refresh System Telemetry & Tasks', icon: '⟳', shortcut: 'Action' }
-    ];
-
-    // Filter items
-    const matchingNav = navItems.filter(n => !q || n.title.toLowerCase().includes(q));
-    const matchingActions = actionItems.filter(a => !q || a.title.toLowerCase().includes(q));
-    
-    // Filter Connectors
-    const matchingConnectors = (cachedConnectors.length ? cachedConnectors : [
-        { id: 'google-search-console', name: 'Google Search Console', category: 'seo_analytics' },
-        { id: 'gmail', name: 'Gmail API', category: 'communication' },
-        { id: 'google-calendar', name: 'Google Calendar', category: 'productivity' },
-        { id: 'slack', name: 'Slack Bot & Webhooks', category: 'communication' },
-        { id: 'github', name: 'GitHub API & Actions', category: 'developer_tools' }
-    ]).filter(c => !q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || (c.category && c.category.toLowerCase().includes(q)))
-      .map(c => ({ type: 'connector', id: c.id, title: c.name, sub: c.category || 'tool', iconSvg: getConnectorIconSvg(c.icon || 'plug'), shortcut: 'Tool' }));
-
-    // Filter Agents (from 32 agents)
-    const matchingAgents = (cachedAgents.length ? cachedAgents : [
-        { id: 'coordinator', name: 'Workforce Coordinator', description: 'Task decomposition and master orchestration' },
-        { id: 'software-engineer', name: 'Software Engineer', description: 'Full-stack development, Python, JS, refactoring' },
-        { id: 'browser-use-agent', name: 'Browser Use Agent', description: 'Autonomous web navigation & DOM extraction' },
-        { id: 'market-seo-geo-researcher', name: 'Market & SEO Analyst', description: 'GEO-targeted search, competitive intelligence' },
-        { id: 'deployment-agent', name: 'Deployment Agent', description: 'Vercel, CI/CD pipelines, container runtime' },
-        { id: 'master-reporting-agent', name: 'Master Reporting Agent', description: 'Executive audits and milestone telemetry' }
-    ]).filter(a => !q || a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.description && a.description.toLowerCase().includes(q)))
-      .map(a => ({ type: 'agent', id: a.id, title: a.name, sub: a.description || a.id, icon: '🤖', shortcut: 'Agent' }));
-
-    // Filter Projects
-    const matchingProjects = cachedProjects
-        .filter(p => !q || p.name.toLowerCase().includes(q) || (p.description && p.description.toLowerCase().includes(q)))
-        .map(p => ({ type: 'project', id: p.id, title: p.name, sub: p.category || 'project', icon: '📁', shortcut: 'Project' }));
-
-    let html = '';
-
-    if (matchingActions.length) {
-        html += '<div class="palette-group-title">Quick Actions</div>';
-        matchingActions.forEach(item => {
-            const index = paletteCurrentResults.length;
-            paletteCurrentResults.push(item);
-            html += `
-                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
-                    <div class="palette-item-left">
-                        <span class="palette-item-icon">${item.icon}</span>
-                        <span class="palette-item-title">${item.title}</span>
-                    </div>
-                    <span class="palette-item-shortcut">${item.shortcut}</span>
-                </div>
-            `;
-        });
-    }
-
-    if (matchingConnectors.length) {
-        html += '<div class="palette-group-title">Agent Tools & Connectors</div>';
-        matchingConnectors.slice(0, 4).forEach(item => {
-            const index = paletteCurrentResults.length;
-            paletteCurrentResults.push(item);
-            html += `
-                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
-                    <div class="palette-item-left">
-                        <span class="palette-item-icon">${item.iconSvg}</span>
-                        <span class="palette-item-title">${item.title}</span>
-                        <span class="palette-item-sub">· ${item.sub}</span>
-                    </div>
-                    <span class="palette-item-shortcut">${item.shortcut}</span>
-                </div>
-            `;
-        });
-    }
-
-    if (matchingProjects.length) {
-        html += '<div class="palette-group-title">Projects</div>';
-        matchingProjects.slice(0, 4).forEach(item => {
-            const index = paletteCurrentResults.length;
-            paletteCurrentResults.push(item);
-            html += `
-                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
-                    <div class="palette-item-left">
-                        <span class="palette-item-icon">${item.icon}</span>
-                        <span class="palette-item-title">${item.title}</span>
-                        <span class="palette-item-sub">· ${item.sub}</span>
-                    </div>
-                    <span class="palette-item-shortcut">${item.shortcut}</span>
-                </div>
-            `;
-        });
-    }
-
-    if (matchingAgents.length) {
-        html += '<div class="palette-group-title">Workforce Agents</div>';
-        matchingAgents.slice(0, 5).forEach(item => {
-            const index = paletteCurrentResults.length;
-            paletteCurrentResults.push(item);
-            html += `
-                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
-                    <div class="palette-item-left">
-                        <span class="palette-item-icon">${item.icon}</span>
-                        <span class="palette-item-title">${item.title}</span>
-                        <span class="palette-item-sub">· ${item.sub}</span>
-                    </div>
-                    <span class="palette-item-shortcut">${item.shortcut}</span>
-                </div>
-            `;
-        });
-    }
-
-    if (matchingNav.length) {
-        html += '<div class="palette-group-title">Navigation Views</div>';
-        matchingNav.slice(0, 6).forEach(item => {
-            const index = paletteCurrentResults.length;
-            paletteCurrentResults.push(item);
-            html += `
-                <div class="palette-item ${index === 0 ? 'selected' : ''}" data-index="${index}" onclick="window.selectPaletteItem(${index})">
-                    <div class="palette-item-left">
-                        <span class="palette-item-icon">${item.icon}</span>
-                        <span class="palette-item-title">${item.title}</span>
-                    </div>
-                    <span class="palette-item-shortcut">${item.shortcut}</span>
-                </div>
-            `;
-        });
-    }
-
-    if (!paletteCurrentResults.length) {
-        html = '<div style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">No agents, projects, or views matched your search.</div>';
-    }
-
-    listEl.innerHTML = html;
-    paletteSelectedIndex = 0;
-}
-
-function updatePaletteHighlight() {
-    const items = document.querySelectorAll('.palette-item');
-    items.forEach((el, idx) => {
-        el.classList.toggle('selected', idx === paletteSelectedIndex);
-        if (idx === paletteSelectedIndex) {
-            el.scrollIntoView({ block: 'nearest' });
-        }
-    });
-}
-
-function executePaletteSelection() {
-    if (paletteCurrentResults[paletteSelectedIndex]) {
-        window.selectPaletteItem(paletteSelectedIndex);
-    }
-}
-
-window.selectPaletteItem = function(index) {
-    const item = paletteCurrentResults[index];
-    if (!item) return;
-    window.closeCommandPalette();
-
-    if (item.type === 'view') {
-        const navBtn = document.querySelector(`.nav-item[data-tab="${item.id}"]`);
-        if (navBtn) navBtn.click();
-    } else if (item.type === 'action') {
-        if (item.action === 'new_project') window.openNewProjectModal();
-        else if (item.action === 'voice_prompt') window.toggleVoicePrompt();
-        else if (item.action === 'refresh') window.refreshActiveTab();
-    } else if (item.type === 'connector') {
-        const navBtn = document.querySelector('.nav-item[data-tab="connectors"]');
-        if (navBtn) navBtn.click();
-        window.openConfigureConnectorModal(item.id);
-    } else if (item.type === 'project') {
-        selectedProjectId = item.id;
-        const sel = document.getElementById('chatProjectSelect');
-        if (sel) sel.value = item.id;
-        const navBtn = document.querySelector(`.nav-item[data-tab="home"]`);
-        if (navBtn) navBtn.click();
-    } else if (item.type === 'agent') {
-        const sel = document.getElementById('chatAgentSelect');
-        if (sel) sel.value = item.id;
-        const navBtn = document.querySelector(`.nav-item[data-tab="home"]`);
-        if (navBtn) navBtn.click();
-        const input = document.getElementById('chatPromptInput');
-        if (input) {
-            input.focus();
-            input.placeholder = `Prompting ${item.title} directly...`;
-        }
-    }
-};
-
-window.selectTaskAndOpen = function(taskId) {
-    const navBtn = document.querySelector(`.nav-item[data-tab="tasks"]`);
-    if (navBtn) navBtn.click();
-    window.selectTask(taskId);
-};
-
-// --- 3. Department Forcespace Filter ---
-
-window.filterForcespace = function(department) {
-    selectedDepartment = department;
-
-    // Update filter pills styling
-    document.querySelectorAll('.filter-pill').forEach(pill => {
-        pill.classList.toggle('active', pill.textContent.toLowerCase().includes(department) || (department === 'all' && pill.textContent.includes('All')));
-    });
-
-    // Filter active projects grid
-    let filtered = cachedProjects;
-    if (department !== 'all') {
-        const depMap = {
-            'engineering': ['core_infrastructure', 'development', 'system'],
-            'intelligence': ['market_research', 'browser_automation', 'data'],
-            'growth': ['marketing', 'seo', 'social', 'content'],
-            'operations': ['coordination', 'audit', 'general']
-        };
-        const categories = depMap[department] || [department];
-        filtered = cachedProjects.filter(p => categories.includes(p.category) || (p.lead_agent_id && p.lead_agent_id.includes(department)));
-    }
-    renderHomeProjects(filtered.length ? filtered : cachedProjects);
-};
-
-function formatRelativeTime(dateStr) {
-    if (!dateStr) return 'just now';
-    try {
-        const d = new Date(dateStr);
-        const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
-        if (diffSec < 60) return `${diffSec}s ago`;
-        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-        return `${Math.floor(diffSec / 86400)}d ago`;
-    } catch {
-        return 'recently';
-    }
+const SUPABASE_URL = 'https://jzyqmzjfmaceoltlqukh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6eXFtempmbWFjZW9sdGxxdWtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDYwOTYsImV4cCI6MjA4MjUyMjA5Nn0.YAVM5D58S656v4LMOh-Sc5AGA5rtPZw5jOxhVEJ3NtA';
+const LOCAL_WORKER_URL = 'http://127.0.0.1:8765';
+
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+let session = null;
+let projects = [];
+let activeProjectId = null;
+let workerOnline = false;
+let isSignUpMode = false;
+
+function showToast(msg) {
+  const bar = document.getElementById('toast-bar');
+  if (!bar) return;
+  bar.textContent = msg;
+  bar.classList.remove('hidden');
+  setTimeout(() => bar.classList.add('hidden'), 6000);
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
+async function apiFetch(path, options = {}) {
+  const token = session?.access_token || SUPABASE_ANON_KEY;
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || data.error || 'Request failed');
+  return data;
+}
 
-// ==========================================================================
-// Connectors & Tools Management
-// ==========================================================================
+async function checkLocalWorker() {
+  const badge = document.getElementById('worker-badge');
+  if (!badge) return;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const res = await fetch(`${LOCAL_WORKER_URL}/health`, { signal: ctrl.signal });
+    clearTimeout(t);
+    workerOnline = res.ok;
+  } catch {
+    workerOnline = false;
+  }
+  badge.textContent = workerOnline
+    ? '● Local Worker Connected (8765)'
+    : '○ Cloud / AntiGravity Mode';
+  badge.classList.toggle('online', workerOnline);
+}
 
-async function loadConnectors(silent = false) {
-    try {
-        const res = await fetch('/api/connectors');
-        const data = await res.json();
-        cachedConnectors = Array.isArray(data) ? data : [];
-        renderConnectors(cachedConnectors);
-    } catch (e) {
-        console.warn('Connectors fetch deferred:', e);
+// --- Projects ---
+async function loadProjects() {
+  try {
+    const data = await apiFetch('/api/projects');
+    projects = data.projects || [];
+    if (!activeProjectId && projects.length > 0) {
+      activeProjectId = projects[0].id;
     }
+    renderProjects();
+    if (activeProjectId) await loadActiveWorkspace();
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
-window.refreshConnectors = function() {
-    loadConnectors();
+function renderProjects() {
+  const list = document.getElementById('project-list');
+  if (!list) return;
+  if (projects.length === 0) {
+    list.innerHTML = `<div class="subtext" style="font-size:0.8rem; padding:0.5rem;">No projects yet. Click "+ New Project" to begin.</div>`;
+    return;
+  }
+  list.innerHTML = projects
+    .map(
+      (p) =>
+        `<div class="project-item ${p.id === activeProjectId ? 'active' : ''}" onclick="selectProject('${p.id}')">
+          ${escapeHtml(p.name)}
+        </div>`
+    )
+    .join('');
+
+  const current = projects.find((p) => p.id === activeProjectId);
+  if (current) {
+    const nameEl = document.getElementById('active-project-name');
+    const goalEl = document.getElementById('active-project-goal');
+    if (nameEl) nameEl.textContent = current.name;
+    if (goalEl) goalEl.textContent = current.goal || 'No project goal set yet. Edit in Project Settings.';
+
+    const setName = document.getElementById('set-name');
+    const setGoal = document.getElementById('set-goal');
+    const setRuntime = document.getElementById('set-runtime');
+    const setAgents = document.getElementById('set-agents');
+    if (setName) setName.value = current.name;
+    if (setGoal) setGoal.value = current.goal || '';
+    if (setRuntime) setRuntime.value = current.runtime_mode || 'antigravity';
+    if (setAgents) setAgents.value = (current.assigned_agents || []).join(', ');
+  }
+}
+
+window.selectProject = async function (id) {
+  activeProjectId = id;
+  renderProjects();
+  await loadActiveWorkspace();
 };
 
-function getConnectorIconSvg(name) {
-    const icons = {
-        'search': '<svg class="lucide-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
-        'mail': '<svg class="lucide-icon" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>',
-        'calendar': '<svg class="lucide-icon" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"></rect><line x1="16" x1="2" x2="16" y2="6"></line><line x1="8" x1="2" x2="8" y2="6"></line><line x1="3" x1="10" x2="21" y2="10"></line></svg>',
-        'message-square': '<svg class="lucide-icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
-        'git-pull-request': '<svg class="lucide-icon" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path><line x1="6" y1="9" x2="6" y2="21"></line></svg>',
-        'credit-card': '<svg class="lucide-icon" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x1="10" x2="22" y2="10"></line></svg>',
-        'file-text': '<svg class="lucide-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>',
-        'share-2': '<svg class="lucide-icon" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>'
-    };
-    return icons[name] || '<svg class="lucide-icon" viewBox="0 0 24 24"><path d="M12 22v-5"></path><path d="M9 8V2"></path><path d="M15 8V2"></path><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"></path></svg>';
+async function loadActiveWorkspace() {
+  if (!activeProjectId) return;
+  try {
+    const [ws, vault] = await Promise.all([
+      apiFetch(`/api/projects/${activeProjectId}/workspace`),
+      apiFetch(`/api/projects/${activeProjectId}/vault`),
+    ]);
+    renderChat(ws.messages || []);
+    renderReports(ws.runs || []);
+    renderVault(vault.tools || []);
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
-function renderConnectors(connectors) {
-    const container = document.getElementById('connectorsGridContainer');
-    const activeCountEl = document.getElementById('connectorsActiveCount');
-    if (!container) return;
+function renderChat(messages) {
+  const feed = document.getElementById('chat-feed');
+  if (!feed) return;
+  if (messages.length === 0) {
+    feed.innerHTML = `
+      <div class="empty-card">
+        <h3>Talk to your project team</h3>
+        <p>Write a task in plain English or Egyptian Arabic (اتكلم بالمصري أو بالإنجليزي). Your Lead Coordinator will execute the workflow and generate an Admin Report.</p>
+      </div>`;
+    return;
+  }
+  feed.innerHTML = messages
+    .map(
+      (m) => `
+      <div class="msg-bubble ${m.sender_role === 'operator' ? 'msg-operator' : 'msg-coordinator'}" dir="auto">
+        <div class="msg-meta">${escapeHtml(m.sender_name)}</div>
+        <div>${escapeHtml(m.content)}</div>
+      </div>`
+    )
+    .join('');
+  feed.scrollTop = feed.scrollHeight;
+}
 
-    const configuredCount = connectors.filter(c => c.status === 'configured').length;
-    if (activeCountEl) {
-        activeCountEl.textContent = `${configuredCount} Configured`;
-    }
+function renderReports(runs) {
+  const container = document.getElementById('reports-container');
+  if (!container) return;
+  if (runs.length === 0) {
+    container.innerHTML = `<div class="empty-card"><h3>No Admin Reports yet</h3><p>Send a task in the Team Chat tab to run the agent pipeline and generate your first report.</p></div>`;
+    return;
+  }
+  container.innerHTML = runs
+    .map(
+      (r) => `
+      <div class="report-card">
+        <div class="row-between">
+          <strong>${escapeHtml(r.directive)}</strong>
+          <span class="subtext" style="margin:0;font-size:0.78rem;">${r.runtime_used} • ${r.latency_ms}ms</span>
+        </div>
+        <div class="pipeline-steps">
+          ${(r.handoff_steps || [])
+            .map((s) => `<span class="step-chip">${s.step}. ${escapeHtml(s.agent)}: ${escapeHtml(s.action)}</span>`)
+            .join('')}
+        </div>
+        <div class="report-body" dir="auto">${escapeHtml(r.admin_report)}</div>
+      </div>`
+    )
+    .join('');
+}
 
-    if (!connectors.length) {
-        container.innerHTML = '<div class="empty-state">No connectors configured.</div>';
-        return;
-    }
+function renderVault(tools) {
+  const list = document.getElementById('vault-list');
+  if (!list) return;
+  if (tools.length === 0) {
+    list.innerHTML = `<p class="subtext" style="margin-top:0.75rem;">No saved logins attached to this project yet.</p>`;
+    return;
+  }
+  list.innerHTML = tools
+    .map(
+      (t) => `
+      <div class="vault-row">
+        <div>
+          <strong>${escapeHtml(t.tool_name)}</strong>
+          <div class="subtext" style="margin:0;font-size:0.8rem;">${escapeHtml(t.username_identifier)} • ${escapeHtml(t.login_url)}</div>
+          <div style="font-size:0.76rem;color:#059669;margin-top:0.2rem;">Allowed actions: ${(t.allowed_actions || []).join(', ')}</div>
+        </div>
+        <button class="btn-danger" onclick="removeVaultTool('${t.id}')">Remove</button>
+      </div>`
+    )
+    .join('');
+}
 
-    container.innerHTML = connectors.map(c => {
-        const isConfigured = c.status === 'configured';
-        const statusBadge = isConfigured
-            ? '<span class="hud-badge success"><span class="status-dot dot-emerald"></span> Connected</span>'
-            : '<span class="hud-badge warn"><span class="status-dot dot-amber"></span> Not Configured</span>';
+window.removeVaultTool = async function (vaultId) {
+  try {
+    await apiFetch(`/api/vault/${vaultId}`, { method: 'DELETE' });
+    await loadActiveWorkspace();
+  } catch (err) {
+    showToast(err.message);
+  }
+};
 
-        return `
-            <div class="connector-card" id="card-connector-${c.id}">
-                <div>
-                    <div class="connector-header">
-                        <div class="connector-header-left">
-                            <div class="connector-icon-wrap">
-                                ${getConnectorIconSvg(c.icon || 'plug')}
-                            </div>
-                            <div class="connector-title-box">
-                                <h3>${escapeHtml(c.name)}</h3>
-                                <span class="tag" style="font-size:10px;">${c.category}</span>
-                            </div>
-                        </div>
-                        ${statusBadge}
-                    </div>
-                    <div class="connector-desc">${escapeHtml(c.description)}</div>
-                    <div class="capabilities-list">
-                        ${(c.capabilities || []).map(cap => `<span class="capability-chip">${cap}</span>`).join('')}
-                    </div>
-                    <div class="connector-agents">
-                        <strong>Assigned:</strong> ${(c.assigned_agents || []).map(a => `<code>${a}</code>`).join(', ')}
-                    </div>
-                </div>
-                <div class="connector-footer">
-                    <span style="font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">
-                        ${c.last_tested ? `Tested: ${formatRelativeTime(c.last_tested)}` : 'Handshake: Idle'}
-                    </span>
-                    <div style="display:flex; gap:6px;">
-                        ${isConfigured ? `<button class="btn btn-secondary btn-sm" onclick="window.testConnector('${c.id}')">Test</button>` : ''}
-                        <button class="btn btn-primary btn-sm" onclick="window.openConfigureConnectorModal('${c.id}')">
-                            ${isConfigured ? 'Configure' : 'Connect Tool'}
-                        </button>
-                    </div>
-                </div>
+// --- Connectors ---
+async function loadConnectors() {
+  const grid = document.getElementById('connectors-grid');
+  if (!grid) return;
+  try {
+    const data = await apiFetch('/api/connectors');
+    const list = data.connectors || [];
+    grid.innerHTML = list
+      .map(
+        (c) => `
+        <div class="connector-card">
+          <div>
+            <div class="connector-header">
+              <span class="connector-title">${escapeHtml(c.name)}</span>
+              <span class="connector-badge ${c.status === 'configured' ? 'badge-configured' : 'badge-available'}">
+                <span class="dot ${c.status === 'configured' ? 'emerald' : 'blue'}" style="width:6px;height:6px;"></span>
+                ${escapeHtml(c.status)}
+              </span>
             </div>
-        `;
-    }).join('');
+            <p class="connector-desc" style="margin-top:0.5rem;">${escapeHtml(c.description)}</p>
+          </div>
+          <div>
+            <div class="connector-meta">${escapeHtml(c.auth_type)}</div>
+            <div style="margin-top:0.6rem; display:flex; gap:0.5rem;">
+              <button class="btn-secondary small" onclick="testConnector('${c.id}')">Test</button>
+            </div>
+          </div>
+        </div>`
+      )
+      .join('');
+  } catch (err) {
+    grid.innerHTML = `<p class="subtext">Error loading connectors: ${err.message}</p>`;
+  }
 }
 
-window.openConfigureConnectorModal = function(connectorId) {
-    const c = cachedConnectors.find(item => item.id === connectorId);
-    if (!c) return;
+window.testConnector = async function (connectorId) {
+  try {
+    const res = await apiFetch(`/api/connectors/${connectorId}/test`, { method: 'POST' });
+    alert(`Connection test passed for ${connectorId}! Latency: ${res.latency_ms}ms`);
+  } catch (err) {
+    alert(`Test error: ${err.message}`);
+  }
+};
 
-    const modal = document.getElementById('configureConnectorModal');
-    const titleEl = document.getElementById('confConnectorModalTitle');
-    const idInput = document.getElementById('confConnectorId');
-    const authInput = document.getElementById('confConnectorAuth');
-    const checklist = document.getElementById('confConnectorAgentsChecklist');
+// --- 32 Workforce Agents ---
+const WORKFORCE_32_AGENTS = [
+  { id: "core-orchestrator", name: "Core Orchestrator", dept: "Operations" },
+  { id: "coordinator", name: "Lead Coordinator", dept: "Operations" },
+  { id: "task-decomposer", name: "Task Decomposer", dept: "Operations" },
+  { id: "context-manager", name: "Context Manager", dept: "Operations" },
+  { id: "software-engineer", name: "Software Engineer", dept: "Engineering" },
+  { id: "code-reviewer", name: "Code Reviewer", dept: "Engineering" },
+  { id: "ast-security-auditor", name: "AST Security Auditor", dept: "Engineering" },
+  { id: "test-automation-lead", name: "Test Lead", dept: "Engineering" },
+  { id: "browser-automation", name: "Browser Automation", dept: "Browser" },
+  { id: "web-navigator", name: "Web Navigator", dept: "Browser" },
+  { id: "dom-extractor", name: "DOM Extractor", dept: "Browser" },
+  { id: "session-persister", name: "Session Persister", dept: "Browser" },
+  { id: "market-seo-analyst", name: "Market & SEO Analyst", dept: "Market & SEO" },
+  { id: "search-console-specialist", name: "Search Console Specialist", dept: "Market & SEO" },
+  { id: "keyword-discovery-agent", name: "Keyword Discovery", dept: "Market & SEO" },
+  { id: "competitor-intelligence", name: "Competitor Intel", dept: "Market & SEO" },
+  { id: "marketing-content-creator", name: "Marketing Creator", dept: "Marketing" },
+  { id: "copywriting-lead", name: "Copywriting Lead", dept: "Marketing" },
+  { id: "social-distributor", name: "Social Distributor", dept: "Marketing" },
+  { id: "email-campaign-architect", name: "Email Campaign Lead", dept: "Marketing" },
+  { id: "deployment-specialist", name: "Deployment Specialist", dept: "Deployment" },
+  { id: "vercel-cloud-engineer", name: "Vercel Cloud Engineer", dept: "Deployment" },
+  { id: "github-actions-operator", name: "GitHub Actions Operator", dept: "Deployment" },
+  { id: "posix-vault-curator", name: "POSIX Vault Curator", dept: "Deployment" },
+  { id: "master-reporting", name: "Master Reporting", dept: "Reporting" },
+  { id: "admin-summary-compiler", name: "Admin Summary Compiler", dept: "Reporting" },
+  { id: "verification-auditor", name: "Independent Verifier", dept: "Reporting" },
+  { id: "telemetry-aggregator", name: "Telemetry Aggregator", dept: "Reporting" },
+  { id: "system-integrator", name: "System Integrator", dept: "Integrator" },
+  { id: "asset-ingestion-worker", name: "Asset Ingestion Worker", dept: "Integrator" },
+  { id: "dependency-resolver", name: "Dependency Resolver", dept: "Integrator" },
+  { id: "rollback-safety-guardian", name: "Rollback Guardian", dept: "Integrator" }
+];
 
-    if (titleEl) titleEl.textContent = `Configure Tool: ${c.name}`;
-    if (idInput) idInput.value = c.id;
-    if (authInput) {
-        authInput.value = c.status === 'configured' ? '••••••••••••••••••••' : '';
-        authInput.placeholder = `Enter credentials for ${c.name} (${c.auth_type})...`;
+function loadAgents() {
+  const grid = document.getElementById('agents-grid');
+  if (!grid) return;
+  grid.innerHTML = WORKFORCE_32_AGENTS
+    .map(
+      (a) => `
+      <div class="agent-card" onclick="inspectAgent('${a.id}', '${a.name}')">
+        <div>
+          <span class="agent-dept">${escapeHtml(a.dept)}</span>
+          <div class="agent-card-title">${escapeHtml(a.name)}</div>
+        </div>
+        <div class="row-between" style="margin-top:0.4rem;">
+          <span style="font-size:0.75rem; color:var(--muted); font-family:var(--mono);">AGENT.md • SKILL.md</span>
+          <span style="font-size:0.75rem; color:var(--accent); font-weight:600;">View →</span>
+        </div>
+      </div>`
+    )
+    .join('');
+}
+
+window.inspectAgent = async function (agentId, agentName) {
+  const modal = document.getElementById('agent-blueprint-modal');
+  const title = document.getElementById('modal-agent-name');
+  const body = document.getElementById('blueprint-content');
+  title.textContent = `${agentName} (${agentId})`;
+  body.textContent = 'Loading agent blueprint and memory...';
+  modal.classList.remove('hidden');
+
+  try {
+    const data = await apiFetch(`/api/agents/${agentId}/context`);
+    body.textContent = `${data.agent_md}\n\n---\n\n${data.skill_md}\n\n---\n\n${data.memory_md}`;
+  } catch (err) {
+    body.textContent = `# Blueprint: ${agentId}\n\nDepartment: Sovereign Workforce\nRuntime: AntiGravity Local Mac Sandboxed\nMemory: Persistent across project pipeline handoffs.`;
+  }
+};
+
+// --- Event Listeners ---
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach((c) => c.classList.add('hidden'));
+    btn.classList.add('active');
+    const tabSection = document.getElementById(`tab-${btn.dataset.tab}`);
+    if (tabSection) tabSection.classList.remove('hidden');
+
+    if (btn.dataset.tab === 'connectors') loadConnectors();
+    if (btn.dataset.tab === 'agents') loadAgents();
+  });
+});
+
+const closeAgentBtn = document.getElementById('close-agent-modal-btn');
+if (closeAgentBtn) {
+  closeAgentBtn.addEventListener('click', () => {
+    document.getElementById('agent-blueprint-modal').classList.add('hidden');
+  });
+}
+
+document.getElementById('auth-toggle').addEventListener('click', () => {
+  isSignUpMode = !isSignUpMode;
+  document.getElementById('auth-submit').textContent = isSignUpMode ? 'Create Account' : 'Sign in';
+  document.getElementById('auth-toggle').textContent = isSignUpMode
+    ? 'Already have an account? Sign in'
+    : 'Create a new operator account';
+});
+
+document.getElementById('auth-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.classList.add('hidden');
+
+  if (!sb) {
+    startApp({ user: { email }, access_token: SUPABASE_ANON_KEY });
+    return;
+  }
+
+  const { data, error } = isSignUpMode
+    ? await sb.auth.signUp({ email, password })
+    : await sb.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (data?.session) {
+    startApp(data.session);
+  } else if (data?.user) {
+    // If autoconfirmed, try sign in
+    const signInRes = await sb.auth.signInWithPassword({ email, password });
+    if (signInRes.data?.session) {
+      startApp(signInRes.data.session);
+    } else {
+      errEl.textContent = 'Account created! Please sign in.';
+      errEl.classList.remove('hidden');
+      isSignUpMode = false;
+      document.getElementById('auth-submit').textContent = 'Sign in';
     }
+  }
+});
 
-    if (checklist) {
-        const availableAgents = cachedAgents.length ? cachedAgents : [
-            { id: 'coordinator', name: 'Workforce Coordinator' },
-            { id: 'software-engineer', name: 'Software Engineer' },
-            { id: 'browser-use-agent', name: 'Browser Use Agent' },
-            { id: 'market-seo-geo-researcher', name: 'Market & SEO Analyst' },
-            { id: 'deployment-agent', name: 'Deployment Agent' },
-            { id: 'master-reporting-agent', name: 'Master Reporting Agent' }
-        ];
-
-        checklist.innerHTML = availableAgents.map(a => {
-            const checked = (c.assigned_agents || []).includes(a.id) ? 'checked' : '';
-            return `
-                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
-                    <input type="checkbox" name="connectorAgent" value="${a.id}" ${checked}>
-                    <span>${a.name} (<code>${a.id}</code>)</span>
-                </label>
-            `;
-        }).join('');
-    }
-
-    if (modal) modal.classList.add('active');
-};
-
-window.closeConfigureConnectorModal = function() {
-    const modal = document.getElementById('configureConnectorModal');
-    if (modal) modal.classList.remove('active');
-};
-
-window.testConnector = async function(connectorId) {
-    try {
-        const res = await fetch(`/api/connectors/${connectorId}/test`, { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-            alert(`✓ ${data.message} (Latency: ${data.latency_ms || 42}ms)`);
-            loadConnectors();
-        } else {
-            alert(`Connection test failed: ${data.error || 'Unknown error'}`);
-        }
-    } catch (err) {
-        alert('Test failed: ' + err.message);
-    }
-};
-
-window.testConnectorFromModal = function() {
-    const id = document.getElementById('confConnectorId')?.value;
-    if (id) window.testConnector(id);
-};
-
-window.handleSaveConnector = async function(e) {
-    e.preventDefault();
-    const id = document.getElementById('confConnectorId')?.value;
-    const authVal = document.getElementById('confConnectorAuth')?.value;
-    if (!id) return;
-
-    const checkedAgents = Array.from(document.querySelectorAll('input[name="connectorAgent"]:checked')).map(el => el.value);
-
-    try {
-        const res = await fetch(`/api/connectors/${id}/configure`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                auth_credentials: { token: authVal },
-                assigned_agents: checkedAgents
-            })
-        });
-
-        if (!res.ok) throw new Error(await res.text());
-        window.closeConfigureConnectorModal();
-        await loadConnectors();
-        alert(`✓ Successfully configured and bound ${id} to ${checkedAgents.length} agents.`);
-    } catch (err) {
-        alert('Failed to configure connector: ' + err.message);
-    }
-};
-
-// ==========================================================================
-// Interactive DAG Visualizer Canvas & Node Inspector
-// ==========================================================================
-
-let dagZoom = 1;
-
-window.zoomDag = function(factor) {
-    dagZoom = Math.max(0.6, Math.min(2.0, dagZoom * factor));
-    const svg = document.getElementById('dagSvgCanvas');
-    if (svg) svg.style.transform = `scale(${dagZoom})`;
-};
-
-window.resetDagZoom = function() {
-    dagZoom = 1;
-    const svg = document.getElementById('dagSvgCanvas');
-    if (svg) svg.style.transform = 'scale(1)';
-};
-
-const DAG_NODES_DATA = {
-    goal: {
-        title: "Owner Objective & Input Protocol",
-        desc: "Ingests user goal via Web Speech API, text command bar, or JSON API with privacy tier flags.",
-        runtime: "Web UI / Voice / JSON",
-        check: "Input Sanitation & Auth",
-        logs: "Status: VALIDATED\nPriority: High\nChannel: Voice Prompt Stream\nTarget Project: proj-core-os"
-    },
-    coordinator: {
-        title: "Workforce Coordinator",
-        desc: "Decomposes high-level goal into parallel and sequential execution steps via 3-file blueprint.",
-        runtime: "Local Mac · Python Orchestrator",
-        check: "DAG Acyclicity & Schema Check",
-        logs: "Decomposed: 3 Sub-Tasks\nPrerequisites: Resolved\nAssigned Specialists: 3\nConcurrency: Parallel Mode"
-    },
-    allocator: {
-        title: "Resource & Capability Allocator",
-        desc: "Locks local hardware resources, verifies credential vault access, and checks model quotas.",
-        runtime: "Local Mac · POSIX 0600",
-        check: "Vault Scope Token Verified",
-        logs: "Hardware Node: macbook-pro-primary\nSecrets Leaked: 0\nPermissions: Granted (Temporary Session)"
-    },
-    swe: {
-        title: "Software Engineer Specialist",
-        desc: "Generates production code, scripts, refactorings, and unit test suites.",
-        runtime: "Local Mac · Python / Node Sandbox",
-        check: "Python AST Parsing & Syntax Check",
-        logs: "Source Files Written: 3\nUnit Tests Executed: Passed (14/14)\nLint Check: 0 Errors\nDeliverable: Ready"
-    },
-    browser: {
-        title: "Browser Use Specialist",
-        desc: "Headless Chromium navigation, DOM structure extraction, and visual screenshot verification.",
-        runtime: "Playwright · Headless Chromium",
-        check: "DOM Element Assertion & Snapshot",
-        logs: "Target URL: https://...\nNavigation State: DOMContentLoaded\nInteractive Form Filled: Success\nArtifacts: 1 Screenshot"
-    },
-    seo: {
-        title: "Market & SEO Specialist",
-        desc: "GEO-targeted search console performance queries, SERP clustering, and competitive intelligence.",
-        runtime: "Local Mac · Search Console API",
-        check: "JSON Schema Data Validation",
-        logs: "Target Keywords: 25 Clustered\nSearch Volume Extracted: Complete\nTop Rankings Identified: 8\nDeliverable: Ready"
-    },
-    verifier: {
-        title: "Independent Verifier (6/6 Checks)",
-        desc: "Applies 6 deterministic checks: syntax, test pass, no secret leakage, idempotency, AST, and schema.",
-        runtime: "Deterministic Code Engine",
-        check: "6/6 Formal Invariants PASS",
-        logs: "Check 1 (Syntax): PASS\nCheck 2 (Tests): PASS\nCheck 3 (Vault Leakage): PASS (0 leaks)\nCheck 4 (Idempotency): PASS\nCheck 5 (AST): PASS\nCheck 6 (Schema): PASS"
-    },
-    reporter: {
-        title: "Master Reporting Agent",
-        desc: "Synthesizes multi-agent outputs into final executive deliverable, logs audit, and updates project status.",
-        runtime: "Local Mac · WAL Reporter",
-        check: "Deliverable Completeness Certified",
-        logs: "Audit Event Recorded: ID #ev-8192\nSupabase Cloud State: Synchronized\nProject Progress: Updated (100%)\nStatus: COMPLETE"
-    }
-};
-
-window.selectDagNode = function(nodeId) {
-    document.querySelectorAll('.dag-interactive-node').forEach(n => n.classList.remove('active'));
-    const target = document.getElementById(`node-${nodeId}`) || document.getElementById(`node-worker-${nodeId}`);
-    if (target) target.classList.add('active');
-
-    const data = DAG_NODES_DATA[nodeId];
-    if (!data) return;
-
-    const titleEl = document.getElementById('inspectorNodeTitle');
-    const descEl = document.getElementById('inspectorNodeDesc');
-    const runtimeEl = document.getElementById('inspectorNodeRuntime');
-    const checkEl = document.getElementById('inspectorNodeCheck');
-    const logsEl = document.getElementById('inspectorNodeLogs');
-
-    if (titleEl) titleEl.textContent = data.title;
-    if (descEl) descEl.textContent = data.desc;
-    if (runtimeEl) runtimeEl.textContent = data.runtime;
-    if (checkEl) checkEl.textContent = data.check;
-    if (logsEl) logsEl.textContent = data.logs;
-};
-
-window.simulateDagRun = async function() {
-    const btn = document.getElementById('btnSimulateDag');
-    if (btn) btn.disabled = true;
-
-    const sequence = [
-        { id: 'goal', edge: 'dagEdge1' },
-        { id: 'coordinator', edge: 'dagEdge2' },
-        { id: 'allocator', edges: ['dagEdge3a', 'dagEdge3b', 'dagEdge3c'] },
-        { ids: ['swe', 'browser', 'seo'], edges: ['dagEdge4a', 'dagEdge4b', 'dagEdge4c'] },
-        { id: 'verifier', edge: 'dagEdge5' },
-        { id: 'reporter' }
-    ];
-
-    document.querySelectorAll('.dag-edge').forEach(e => e.classList.remove('active'));
-    document.querySelectorAll('.dag-interactive-node').forEach(n => n.classList.remove('active'));
-
-    for (const step of sequence) {
-        if (step.id) {
-            window.selectDagNode(step.id);
-        } else if (step.ids) {
-            step.ids.forEach(id => {
-                const node = document.getElementById(`node-worker-${id}`);
-                if (node) node.classList.add('active');
-            });
-            window.selectDagNode('swe');
-        }
-
-        if (step.edge) {
-            const edge = document.getElementById(step.edge);
-            if (edge) edge.classList.add('active');
-        }
-        if (step.edges) {
-            step.edges.forEach(eId => {
-                const edge = document.getElementById(eId);
-                if (edge) edge.classList.add('active');
-            });
-        }
-
-        await new Promise(r => setTimeout(r, 650));
-    }
-
-    if (btn) btn.disabled = false;
-};
-
-// ==========================================================================
-// Agent Blueprint Inspector Modal (Universal 3-File Standard)
-// ==========================================================================
-
-let currentBlueprintAgent = null;
-let currentBlueprintTab = 'agent';
-
-window.openAgentBlueprints = async function(agentId) {
-    currentBlueprintAgent = cachedAgents.find(a => a.id === agentId) || { id: agentId, name: agentId, role: 'Specialist Agent' };
-    const modal = document.getElementById('agentBlueprintModal');
-    const nameEl = document.getElementById('bpAgentName');
-    const roleEl = document.getElementById('bpAgentRole');
-    const tagEl = document.getElementById('bpAgentIdTag');
-
-    if (nameEl) nameEl.textContent = currentBlueprintAgent.name;
-    if (roleEl) roleEl.textContent = currentBlueprintAgent.role || currentBlueprintAgent.description || 'Specialist Subagent';
-    if (tagEl) tagEl.textContent = `/${currentBlueprintAgent.id}`;
-
-    if (modal) modal.classList.add('active');
-    window.switchBlueprintTab('agent');
-};
-
-window.closeAgentBlueprintModal = function() {
-    const modal = document.getElementById('agentBlueprintModal');
-    if (modal) modal.classList.remove('active');
-};
-
-window.switchBlueprintTab = async function(tab) {
-    currentBlueprintTab = tab;
-    ['agent', 'skill', 'memory'].forEach(t => {
-        const btn = document.getElementById(`bpTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
-        if (btn) btn.classList.toggle('active', t === tab);
+// Guest / Sovereign Local Mode
+const guestBtn = document.getElementById('guest-login-btn');
+if (guestBtn) {
+  guestBtn.addEventListener('click', () => {
+    startApp({
+      user: { email: 'operator@sovereign-workforce.local' },
+      access_token: SUPABASE_ANON_KEY,
     });
+  });
+}
 
-    const viewer = document.getElementById('blueprintContentViewer');
-    if (!viewer || !currentBlueprintAgent) return;
+document.getElementById('signout-btn').addEventListener('click', async () => {
+  if (sb) await sb.auth.signOut();
+  location.reload();
+});
 
-    viewer.textContent = 'Loading blueprint specification...';
+document.getElementById('new-project-btn').addEventListener('click', () => {
+  document.getElementById('project-modal').classList.remove('hidden');
+});
 
+document.getElementById('close-modal-btn').addEventListener('click', () => {
+  document.getElementById('project-modal').classList.add('hidden');
+});
+
+document.getElementById('create-project-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const data = await apiFetch('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('new-proj-name').value.trim(),
+        goal: document.getElementById('new-proj-goal').value.trim(),
+        runtime_mode: document.getElementById('new-proj-runtime').value,
+      }),
+    });
+    document.getElementById('project-modal').classList.add('hidden');
+    e.target.reset();
+    activeProjectId = data.project.id;
+    await loadProjects();
+  } catch (err) {
+    showToast(err.message);
+  }
+});
+
+document.getElementById('settings-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!activeProjectId) return;
+  const agents = document
+    .getElementById('set-agents')
+    .value.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  try {
+    await apiFetch(`/api/projects/${activeProjectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: document.getElementById('set-name').value.trim(),
+        goal: document.getElementById('set-goal').value.trim(),
+        runtime_mode: document.getElementById('set-runtime').value,
+        assigned_agents: agents,
+      }),
+    });
+    await loadProjects();
+  } catch (err) {
+    showToast(err.message);
+  }
+});
+
+document.getElementById('delete-project-btn').addEventListener('click', async () => {
+  if (!activeProjectId || !confirm('Delete this project and all its saved logins and reports?')) return;
+  try {
+    await apiFetch(`/api/projects/${activeProjectId}`, { method: 'DELETE' });
+    activeProjectId = null;
+    await loadProjects();
+  } catch (err) {
+    showToast(err.message);
+  }
+});
+
+document.getElementById('vault-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!activeProjectId) return showToast('Create or select a project first.');
+  const actions = document
+    .getElementById('vault-actions')
+    .value.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  try {
+    await apiFetch('/api/vault', {
+      method: 'POST',
+      body: JSON.stringify({
+        project_id: activeProjectId,
+        tool_name: document.getElementById('vault-tool').value.trim(),
+        login_url: document.getElementById('vault-url').value.trim(),
+        username_identifier: document.getElementById('vault-user').value.trim(),
+        password_or_token: document.getElementById('vault-secret').value,
+        allowed_actions: actions,
+      }),
+    });
+    e.target.reset();
+    await loadActiveWorkspace();
+  } catch (err) {
+    showToast(err.message);
+  }
+});
+
+document.getElementById('chat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!activeProjectId) return showToast('Create or select a project first.');
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send-btn');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Working...';
+
+  let localOutput = null;
+  const currentProj = projects.find((p) => p.id === activeProjectId);
+  if (workerOnline && currentProj?.runtime_mode === 'local_llm') {
     try {
-        const res = await fetch(`/api/agents/${currentBlueprintAgent.id}/context`);
-        if (res.ok) {
-            const data = await res.json();
-            if (tab === 'agent') viewer.textContent = data.agent_md || `# Agent: ${currentBlueprintAgent.name}\n\nUniversal identity specification loaded from disk.`;
-            else if (tab === 'skill') viewer.textContent = data.skill_md || `# Skill Procedure\n\nStep-by-step specialized operating methodology loaded from disk.`;
-            else if (tab === 'memory') viewer.textContent = data.memory_md || `# Memory & Lessons\n\nPersistent lessons learned from owner feedback.`;
-        } else {
-            viewer.textContent = `# ${currentBlueprintAgent.name} — ${tab.toUpperCase()}.md\n\nUniversal three-file standard: AGENT.md, SKILL.md, MEMORY.md\nLocation: config/agents/${currentBlueprintAgent.id}/\nStatus: Fully verified and active in runtime.`;
-        }
+      const wRes = await fetch(`${LOCAL_WORKER_URL}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: msg }),
+      });
+      if (wRes.ok) {
+        const wData = await wRes.json();
+        localOutput = wData.output;
+      }
     } catch {
-        viewer.textContent = `# ${currentBlueprintAgent.name} — ${tab.toUpperCase()}.md\n\nLoaded from local disk under config/agents/${currentBlueprintAgent.id}/`;
+      // Fallback to cloud runtime seamlessly
     }
-};
+  }
 
-window.promptThisAgentFromModal = function() {
-    if (!currentBlueprintAgent) return;
-    window.closeAgentBlueprintModal();
-    const sel = document.getElementById('chatAgentSelect');
-    if (sel) sel.value = currentBlueprintAgent.id;
-    const navBtn = document.querySelector('.nav-item[data-tab="home"]');
-    if (navBtn) navBtn.click();
-    const input = document.getElementById('chatPromptInput');
-    if (input) {
-        input.focus();
-        input.placeholder = `Direct prompt for ${currentBlueprintAgent.name}...`;
+  try {
+    await apiFetch('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        project_id: activeProjectId,
+        message: msg,
+        local_worker_output: localOutput,
+      }),
+    });
+    input.value = '';
+    await loadActiveWorkspace();
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send to Team';
+  }
+});
+
+function startApp(activeSession) {
+  session = activeSession;
+  document.getElementById('auth-view').classList.add('hidden');
+  document.getElementById('app-view').classList.remove('hidden');
+  document.getElementById('user-email').textContent = session.user?.email || 'Operator';
+  checkLocalWorker();
+  setInterval(checkLocalWorker, 15000);
+  loadProjects();
+}
+
+(async function boot() {
+  if (sb) {
+    try {
+      const { data } = await sb.auth.getSession();
+      if (data?.session) {
+        startApp(data.session);
+        return;
+      }
+    } catch (e) {
+      console.warn('Supabase session lookup error:', e);
     }
-};
+  }
+})();

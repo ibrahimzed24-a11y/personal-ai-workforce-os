@@ -1,38 +1,43 @@
 #!/usr/bin/env bash
-# AI Workforce OS Startup Script
-set -e
+set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd "$DIR"
 
-mkdir -p "$DIR/data" "$DIR/logs"
-PID_FILE="$DIR/data/os.pid"
-LOG_FILE="$DIR/logs/os.log"
+mkdir -p .runtime logs data
 
-if [ -f "$PID_FILE" ]; then
-    PID=$(cat "$PID_FILE")
-    if ps -p "$PID" > /dev/null 2>&1; then
-        echo "AI Workforce OS is already running (PID: $PID) at http://127.0.0.1:8765"
-        exit 0
-    else
-        rm -f "$PID_FILE"
-    fi
+# 1. Start Ollama if installed and not already running
+if command -v ollama >/dev/null 2>&1; then
+  if ! curl -sf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    echo "Starting local Ollama server..."
+    nohup ollama serve > .runtime/ollama.log 2>&1 &
+    echo $! > .runtime/ollama.pid
+    sleep 2
+  fi
 fi
 
-echo "Starting AI Workforce OS on http://127.0.0.1:8765..."
-nohup ~/.local/bin/uv run uvicorn core.app:app --host 127.0.0.1 --port 8765 > "$LOG_FILE" 2>&1 &
-OS_PID=$!
-echo "$OS_PID" > "$PID_FILE"
+# 2. Check if local worker is already running on port 8765
+if curl -sf http://127.0.0.1:8765/health >/dev/null 2>&1; then
+  echo "✓ Local Worker & Bridge is already running at http://127.0.0.1:8765"
+  exit 0
+fi
 
-# Wait for health check
+# 3. Start local worker on 8765
+echo "Starting AI Workforce OS Local Worker & Bridge on http://127.0.0.1:8765..."
+PYTHON_BIN="$DIR/.venv/bin/python"
+if [ ! -f "$PYTHON_BIN" ]; then
+  PYTHON_BIN="python3"
+fi
+
+nohup "$PYTHON_BIN" -m uvicorn core.hybrid.runtime_worker:app --host 127.0.0.1 --port 8765 > .runtime/worker.log 2>&1 &
+WORKER_PID=$!
+echo "$WORKER_PID" > .runtime/worker.pid
+echo "$WORKER_PID" > data/os.pid
+
 sleep 2
-for i in {1..15}; do
-    if curl -s http://127.0.0.1:8765/api/health | grep -q "healthy"; then
-        echo "✓ AI Workforce OS is live and healthy (PID: $OS_PID)!"
-        echo "  Web Control Interface: http://127.0.0.1:8765"
-        exit 0
-    fi
-    sleep 1
-done
-
-echo "⚠ Warning: OS started but did not respond to health check within 15 seconds. Check $LOG_FILE"
+if curl -sf http://127.0.0.1:8765/health >/dev/null 2>&1; then
+  echo "✓ AI Workforce OS Local Worker is live at http://127.0.0.1:8765"
+  exit 0
+else
+  echo "⚠ Worker started with PID $WORKER_PID, checking logs in .runtime/worker.log"
+fi
