@@ -1987,6 +1987,12 @@ function startApp(activeSession) {
   checkLocalWorker();
   setInterval(checkLocalWorker, 15000);
   loadProjects();
+  loadAgents();
+  loadConnectors();
+  renderNewProjAgentSelector();
+  renderNewProjToolSelector();
+  renderSetAgentSelector();
+  renderSetToolSelector();
 }
 
 (async function boot() {
