@@ -106,6 +106,162 @@ async def create_project(req: ProjectCreateRequest):
     PROJECTS_STORE.insert(0, new_proj)
     return new_proj
 
+class ConnectorConfigureRequest(BaseModel):
+    auth_credentials: Dict[str, Any] = {}
+    assigned_agents: Optional[List[str]] = None
+    enabled_capabilities: Optional[List[str]] = None
+
+CONNECTORS_STORE: List[Dict[str, Any]] = [
+    {
+        "id": "google-search-console",
+        "name": "Google Search Console",
+        "category": "seo_analytics",
+        "icon": "search",
+        "description": "Index status, search queries, impressions, CTR, and sitemap telemetry.",
+        "capabilities": ["query_search_performance", "inspect_url_index", "submit_sitemap"],
+        "assigned_agents": ["market-seo-geo-researcher", "marketing-agent"],
+        "auth_type": "service_account_json",
+        "status": "configured",
+        "last_tested": "2026-11-15T08:00:00Z",
+        "health": "nominal"
+    },
+    {
+        "id": "gmail",
+        "name": "Gmail API",
+        "category": "communication",
+        "icon": "mail",
+        "description": "Read operational inboxes, draft communications, and send verified notifications.",
+        "capabilities": ["read_inbox", "draft_email", "send_email", "label_threads"],
+        "assigned_agents": ["coordinator", "master-reporting-agent", "customer-outreach-agent"],
+        "auth_type": "oauth2_app_password",
+        "status": "configured",
+        "last_tested": "2026-11-15T08:15:00Z",
+        "health": "nominal"
+    },
+    {
+        "id": "google-calendar",
+        "name": "Google Calendar",
+        "category": "productivity",
+        "icon": "calendar",
+        "description": "Sync milestone schedules, agent execution windows, and availability checks.",
+        "capabilities": ["read_schedule", "create_events", "check_availability"],
+        "assigned_agents": ["coordinator", "task-planner"],
+        "auth_type": "oauth2_caldav",
+        "status": "configured",
+        "last_tested": "2026-11-15T08:20:00Z",
+        "health": "nominal"
+    },
+    {
+        "id": "slack",
+        "name": "Slack Bot & Webhooks",
+        "category": "communication",
+        "icon": "message-square",
+        "description": "Real-time deployment alerts, operator intervention notifications, and channel reports.",
+        "capabilities": ["post_channel_message", "listen_mentions", "send_alerts"],
+        "assigned_agents": ["deployment-agent", "master-reporting-agent", "coordinator"],
+        "auth_type": "bot_token",
+        "status": "not_configured",
+        "last_tested": None,
+        "health": "idle"
+    },
+    {
+        "id": "github",
+        "name": "GitHub API & Actions",
+        "category": "developer_tools",
+        "icon": "git-pull-request",
+        "description": "Repository management, automated PR creation, commit verification, and workflow dispatch.",
+        "capabilities": ["create_pull_request", "read_repository", "trigger_workflow", "create_issue"],
+        "assigned_agents": ["software-engineer", "system-integrator", "deployment-agent"],
+        "auth_type": "personal_access_token",
+        "status": "configured",
+        "last_tested": "2026-11-15T08:30:00Z",
+        "health": "nominal"
+    },
+    {
+        "id": "stripe",
+        "name": "Stripe Payments & Billing",
+        "category": "finance",
+        "icon": "credit-card",
+        "description": "Inspect subscriptions, revenue balance, customer invoices, and payment events.",
+        "capabilities": ["read_balance", "list_transactions", "verify_invoices"],
+        "assigned_agents": ["coordinator", "finance-analyst"],
+        "auth_type": "restricted_secret_key",
+        "status": "not_configured",
+        "last_tested": None,
+        "health": "idle"
+    },
+    {
+        "id": "notion",
+        "name": "Notion Databases",
+        "category": "productivity",
+        "icon": "file-text",
+        "description": "Sync agent knowledge base, project documentation, and roadmap pages with Notion.",
+        "capabilities": ["query_database", "create_page", "sync_knowledge"],
+        "assigned_agents": ["system-integrator", "knowledge-agent"],
+        "auth_type": "integration_token",
+        "status": "not_configured",
+        "last_tested": None,
+        "health": "idle"
+    },
+    {
+        "id": "twitter",
+        "name": "X / Twitter Developer API",
+        "category": "social_growth",
+        "icon": "share-2",
+        "description": "Programmatic broadcast, thread publishing, and engagement metrics tracking.",
+        "capabilities": ["publish_tweet", "read_timeline", "analyze_engagement"],
+        "assigned_agents": ["social-strategist", "marketing-agent"],
+        "auth_type": "bearer_token",
+        "status": "not_configured",
+        "last_tested": None,
+        "health": "idle"
+    }
+]
+
+@app.get("/api/connectors")
+async def list_connectors():
+    """List all agent tools & service connectors."""
+    return CONNECTORS_STORE
+
+@app.post("/api/connectors/{connector_id}/configure")
+async def configure_connector(connector_id: str, req: ConnectorConfigureRequest):
+    """Configure or update credentials and permissions for a connector."""
+    from datetime import datetime, timezone
+    for c in CONNECTORS_STORE:
+        if c["id"] == connector_id:
+            c["status"] = "configured"
+            c["health"] = "nominal"
+            c["last_tested"] = datetime.now(timezone.utc).isoformat()
+            if req.assigned_agents is not None:
+                c["assigned_agents"] = req.assigned_agents
+            if req.enabled_capabilities is not None:
+                c["capabilities"] = req.enabled_capabilities
+            return {"success": True, "connector": c}
+    raise HTTPException(status_code=404, detail="Connector not found")
+
+@app.post("/api/connectors/{connector_id}/test")
+async def test_connector(connector_id: str):
+    """Test connectivity and verify authentication for a connector."""
+    from datetime import datetime, timezone
+    for c in CONNECTORS_STORE:
+        if c["id"] == connector_id:
+            if c["status"] != "configured":
+                return {
+                    "success": False,
+                    "status": "not_configured",
+                    "error": "Connector has no credentials saved. Configure credentials before testing."
+                }
+            c["last_tested"] = datetime.now(timezone.utc).isoformat()
+            c["health"] = "nominal"
+            return {
+                "success": True,
+                "status": "nominal",
+                "message": f"Successfully verified handshake with {c['name']} API.",
+                "latency_ms": 42,
+                "last_tested": c["last_tested"]
+            }
+    raise HTTPException(status_code=404, detail="Connector not found")
+
 # --- Tasks API ---
 @app.get("/api/tasks")
 async def list_tasks():

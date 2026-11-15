@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Workforce OS — Command Center</title>
+    <title>AI Workforce OS — Sovereign Command Center</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,15 +13,23 @@
     <!-- Mobile Top Header Bar -->
     <header class="mobile-header">
         <div class="mobile-header-left">
-            <button class="hamburger-btn" id="mobileMenuToggle" aria-label="Toggle navigation drawer">☰</button>
+            <button class="hamburger-btn" id="mobileMenuToggle" aria-label="Toggle navigation drawer">
+                <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+            </button>
             <div class="mobile-brand-title">
-                <span class="logo-mark" style="width:28px; height:28px; font-size:15px;">⚡</span>
+                <span class="logo-mark" style="width:28px; height:28px;">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                </span>
                 <span>AI Workforce OS</span>
             </div>
         </div>
         <div class="mobile-actions">
-            <button class="btn btn-secondary btn-sm" onclick="window.openCommandPalette()" title="Search or Cmd+K">🔍</button>
-            <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()" title="Refresh data">⟳</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.openCommandPalette()" title="Search or Cmd+K">
+                <svg class="lucide-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()" title="Refresh data">
+                <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
             <button class="btn btn-primary btn-sm" onclick="window.openNewProjectModal()">+ Project</button>
         </div>
     </header>
@@ -33,50 +41,62 @@
         <!-- Sidebar Navigation Drawer -->
         <aside class="sidebar" id="appSidebar">
             <div class="brand">
-                <div class="logo-mark">⚡</div>
+                <div class="logo-mark">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                </div>
                 <div class="brand-text">
                     <h1>AI Workforce OS</h1>
-                    <span class="badge online"><span class="beacon-pulse"></span> Hybrid Sovereign</span>
+                    <span class="badge online"><span class="status-dot dot-emerald"></span> Hybrid Sovereign</span>
                 </div>
             </div>
             
             <nav class="nav-menu">
                 <button class="nav-item active" data-tab="home">
-                    <span class="icon">💬</span> Home & Console
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <span>Home & Console</span>
                 </button>
                 <button class="nav-item" data-tab="projects">
-                    <span class="icon">📁</span> Projects
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Projects</span>
                 </button>
                 <button class="nav-item" data-tab="tasks">
-                    <span class="icon">📋</span> Task Queue
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="6" height="6" rx="1"></rect><path d="m3 17 2 2 4-4"></path><path d="M13 6h8"></path><path d="M13 12h8"></path><path d="M13 18h8"></path></svg>
+                    <span>Task Queue</span>
                 </button>
                 <button class="nav-item" data-tab="agents">
-                    <span class="icon">🤖</span> 32 Agent Workforce
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg>
+                    <span>32 Agent Workforce</span>
                 </button>
                 <button class="nav-item" data-tab="workflows">
-                    <span class="icon">⚡</span> Workflow & DAG
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+                    <span>Workflow & DAG</span>
+                </button>
+                <button class="nav-item" data-tab="connectors">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M12 22v-5"></path><path d="M9 8V2"></path><path d="M15 8V2"></path><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"></path></svg>
+                    <span>Connectors & Tools</span>
                 </button>
                 <button class="nav-item" data-tab="security">
-                    <span class="icon">🔒</span> Sovereign Vault
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path><path d="m9 12 2 2 4-4"></path></svg>
+                    <span>Sovereign Vault</span>
                 </button>
                 <button class="nav-item" data-tab="models">
-                    <span class="icon">🧠</span> LLM & Models
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>
+                    <span>LLM & Models</span>
                 </button>
                 <button class="nav-item" data-tab="integrator">
-                    <span class="icon">🔄</span> System Integrator
-                </button>
-                <button class="nav-item" data-tab="requirements">
-                    <span class="icon">⚙️</span> Requirements
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    <span>System Integrator</span>
                 </button>
                 <button class="nav-item" data-tab="events">
-                    <span class="icon">📜</span> Event Audit Trail
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Event Audit Trail</span>
                 </button>
             </nav>
 
             <div class="system-status-widget">
                 <div class="status-widget-header">
                     <span>Hardware Runtime</span>
-                    <span class="beacon-pulse" title="Live Heartbeat Active"></span>
+                    <span class="status-dot dot-emerald"></span>
                 </div>
                 <div class="status-row">
                     <span class="label">Worker Node:</span>
@@ -91,8 +111,8 @@
                     <span class="val">POSIX 0600</span>
                 </div>
                 <div class="status-row">
-                    <span class="label">Loop Engine:</span>
-                    <span class="val">5-Stage Enforced</span>
+                    <span class="label">Active Loop:</span>
+                    <span class="val">5-Stage Policy</span>
                 </div>
             </div>
         </aside>
@@ -107,14 +127,48 @@
                 </div>
                 <div class="actions">
                     <button class="search-command-btn" onclick="window.openCommandPalette()" title="Search or press Cmd+K">
-                        <span class="icon">🔍</span>
+                        <svg class="lucide-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <span>Search Forcespace</span>
                         <kbd>⌘K</kbd>
                     </button>
-                    <button class="btn btn-secondary" onclick="window.refreshActiveTab()">⟳ Refresh</button>
-                    <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewProjectModal()">+ Create Project</button>
+                    <button class="btn btn-secondary" onclick="window.refreshActiveTab()">
+                        <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        <span>Refresh</span>
+                    </button>
+                    <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewProjectModal()">
+                        <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Create Project</span>
+                    </button>
                 </div>
             </header>
+
+            <!-- Compact Top Telemetry Strip -->
+            <div class="compact-telemetry-strip" id="globalTelemetryStrip">
+                <div class="telemetry-item">
+                    <span class="status-dot dot-emerald"></span>
+                    <span>Worker Node: <strong>MacBook Pro Online</strong></span>
+                </div>
+                <div class="telemetry-divider"></div>
+                <div class="telemetry-item">
+                    <span class="status-dot dot-cyan"></span>
+                    <span>Cloud Queue: <strong>Supabase PG + WAL</strong></span>
+                </div>
+                <div class="telemetry-divider"></div>
+                <div class="telemetry-item">
+                    <span class="status-dot dot-emerald"></span>
+                    <span>Security Vault: <strong>POSIX 0600</strong></span>
+                </div>
+                <div class="telemetry-divider"></div>
+                <div class="telemetry-item">
+                    <span class="status-dot dot-blue"></span>
+                    <span>Execution: <strong>5-Stage Loop Enforced</strong></span>
+                </div>
+                <div class="telemetry-divider"></div>
+                <div class="telemetry-item">
+                    <span class="status-dot dot-emerald"></span>
+                    <span>System Health: <strong id="telemetryHealthScore">98% SOVEREIGN HEALTH</strong></span>
+                </div>
+            </div>
 
             <!-- ==============================================================
                  Tab 0: Home — Chat, Voice Prompting & Projects (First & Primary)
@@ -132,7 +186,7 @@
                             </p>
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <span class="badge online"><span class="beacon-pulse"></span> MacBook Pro Online</span>
+                            <span class="badge online"><span class="status-dot dot-emerald"></span> MacBook Pro Online</span>
                             <span class="tag" style="background:var(--bg-blue-subtle); color:var(--accent);">32 Agents Ready</span>
                         </div>
                     </div>
@@ -141,13 +195,13 @@
                     <div class="chat-command-box">
                         <div class="chat-controls-bar">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">📁 Project:</span>
+                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Project:</span>
                                 <select id="chatProjectSelect" class="control-select" onchange="window.handleChatProjectChange(this.value)">
                                     <!-- Populated dynamically -->
                                 </select>
                             </div>
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">🤖 Assign:</span>
+                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Assign:</span>
                                 <select id="chatAgentSelect" class="control-select">
                                     <option value="coordinator">Auto (Coordinator Decomposition)</option>
                                     <option value="software-engineer">Software Engineer</option>
@@ -160,7 +214,7 @@
                                 </select>
                             </div>
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">⚡ Priority:</span>
+                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Priority:</span>
                                 <select id="chatPrioritySelect" class="control-select">
                                     <option value="high">High</option>
                                     <option value="medium" selected>Medium</option>
@@ -174,17 +228,19 @@
                         <div class="chat-actions-bar">
                             <div class="voice-wrapper">
                                 <button type="button" class="btn-voice" id="voicePromptBtn" onclick="window.toggleVoicePrompt()" title="Click to speak your prompt (Microphone)">
-                                    <span id="voiceMicIcon" style="font-size:18px;">🎙️</span>
+                                    <span id="voiceMicIcon">
+                                        <svg class="lucide-icon md" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                                    </span>
                                     <span id="voiceBtnText">Voice Prompt</span>
                                 </button>
                                 <span class="voice-status-text" id="voiceStatusIndicator">
-                                    <span class="beacon-pulse" style="background:#ef4444;"></span> Listening... speak clearly
+                                    <span class="status-dot dot-rose"></span> Listening... speak clearly
                                 </span>
                             </div>
 
                             <button type="button" class="btn-dispatch" id="dispatchGoalBtn" onclick="window.handleChatSubmit()">
                                 <span>Dispatch Goal</span>
-                                <span>→</span>
+                                <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                             </button>
                         </div>
                     </div>
@@ -200,7 +256,7 @@
                         <div class="hud-card needs-you" id="hudNeedsYouCard">
                             <div class="hud-card-header">
                                 <div class="hud-card-title-group">
-                                    <span style="font-size:16px;">⚠️</span>
+                                    <svg class="lucide-icon" viewBox="0 0 24 24" style="color:var(--warning);"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                                     <span class="hud-card-title">Needs You</span>
                                 </div>
                                 <span class="hud-badge neutral" id="needsYouCountPill">0 items</span>
@@ -214,7 +270,7 @@
                         <div class="hud-card done-today" id="hudDoneTodayCard">
                             <div class="hud-card-header">
                                 <div class="hud-card-title-group">
-                                    <span style="font-size:16px;">🟢</span>
+                                    <svg class="lucide-icon" viewBox="0 0 24 24" style="color:var(--success);"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                     <span class="hud-card-title">Done Today</span>
                                 </div>
                                 <span class="hud-badge success" id="doneTodayCountPill">0 completed</span>
@@ -225,7 +281,7 @@
                         </div>
                     </div>
 
-                    <!-- Executive Telemetry Strip (FounderOS Control Console) -->
+                    <!-- Executive Telemetry Strip -->
                     <div class="telemetry-executive-panel" id="executiveTelemetryPanel">
                         <!-- Left: 220° Radial Health Gauge -->
                         <div class="gauge-box">
@@ -236,7 +292,9 @@
                                 <text x="80" y="74" text-anchor="middle" font-size="24" font-weight="700" fill="#0f172a" id="hudHealthScore">98%</text>
                                 <text x="80" y="92" text-anchor="middle" font-size="10" font-weight="600" fill="#64748b">SOVEREIGN HEALTH</text>
                             </svg>
-                            <span class="tag" style="background:var(--success-bg); color:var(--success); font-weight:600; font-size:11px;">✓ Local Node Online</span>
+                            <span class="tag" style="background:var(--success-bg); color:var(--success); font-weight:600; font-size:11px;">
+                                <span class="status-dot dot-emerald" style="margin-right:4px;"></span> Local Node Online
+                            </span>
                         </div>
 
                         <!-- Center: Dotted-Leader Telemetry Rows -->
@@ -290,11 +348,11 @@
 
                         <!-- Forcespace Department Filter Pills -->
                         <div class="forcespace-filter-bar" id="forcespaceFilterBar">
-                            <button class="filter-pill active" onclick="window.filterForcespace('all')">🌐 All Forcespace (32)</button>
-                            <button class="filter-pill" onclick="window.filterForcespace('engineering')">💻 Engineering & Dev</button>
-                            <button class="filter-pill" onclick="window.filterForcespace('intelligence')">🔍 Intelligence & Research</button>
-                            <button class="filter-pill" onclick="window.filterForcespace('growth')">📈 Growth & Marketing</button>
-                            <button class="filter-pill" onclick="window.filterForcespace('operations')">👑 Command & Operations</button>
+                            <button class="filter-pill active" onclick="window.filterForcespace('all')">All Forcespace (32)</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('engineering')">Engineering & Dev</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('intelligence')">Intelligence & Research</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('growth')">Growth & Marketing</button>
+                            <button class="filter-pill" onclick="window.filterForcespace('operations')">Command & Operations</button>
                         </div>
 
                         <div class="projects-grid" id="homeProjectsGrid">
@@ -337,14 +395,19 @@
                             <span class="task-count badge online" id="taskCountBadge">0 tasks</span>
                         </div>
                         <div class="task-list" id="taskListContainer">
-                            <div class="empty-state">Loading hybrid task queue...</div>
+                            <div class="skeleton-container">
+                                <div class="skeleton-row"></div>
+                                <div class="skeleton-row"></div>
+                                <div class="skeleton-row"></div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Task Detail & Live Execution Viewer Panel -->
                     <div class="panel detail-panel" id="taskDetailPanel">
                         <button class="mobile-back-btn" id="mobileBackToTasksBtn" onclick="window.showTaskListOnMobile()">
-                            ← Back to Task Queue
+                            <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            Back to Task Queue
                         </button>
                         <div class="panel-header">
                             <div>
@@ -368,222 +431,168 @@
                     <div class="panel-header" style="border:none; padding:0 0 16px 0;">
                         <div>
                             <h2>Universal 32-Agent Organization</h2>
-                            <p class="subtext">Every agent operates with sovereign <code>AGENT.md</code>, <code>SKILL.md</code>, and <code>MEMORY.md</code> files.</p>
+                            <p class="subtext">8 Core Orchestrators & 24 Specialist Subagents driven by AGENT.md, SKILL.md, and MEMORY.md</p>
                         </div>
-                        <span class="tag status-completed">32 Agents Active (8 Core + 24 Specialists)</span>
+                        <div class="filter-controls">
+                            <button class="btn btn-secondary btn-sm" onclick="window.filterAgents('all')">All 32</button>
+                            <button class="btn btn-secondary btn-sm" onclick="window.filterAgents('core')">8 Core</button>
+                            <button class="btn btn-secondary btn-sm" onclick="window.filterAgents('specialist')">24 Specialists</button>
+                        </div>
                     </div>
 
-                    <!-- Search & Filter Controls -->
-                    <div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <input type="text" id="agentSearchInput" class="input-field" placeholder="Search agents by role, department, specialist, or skill..." style="max-width:380px;" oninput="window.filterAgents()">
-                    </div>
-
-                    <div class="filter-pills-bar" id="agentDepartmentPills">
-                        <button class="pill-filter active" onclick="window.filterAgentsByDept('all')">All (32)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Operations & Orchestration')">Operations (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Engineering & Architecture')">Engineering (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Browser Automation')">Browser (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Market & Research')">Market & SEO (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Growth & Marketing')">Marketing (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Release & Operations')">Deployment (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('Executive Governance')">Reporting (4)</button>
-                        <button class="pill-filter" onclick="window.filterAgentsByDept('System Evolution')">Integrator (4)</button>
-                    </div>
-
-                    <div class="agent-grid" id="agentGridContainer">
-                        <!-- Loaded dynamically -->
+                    <div class="agents-grid" id="agentsGridContainer">
+                        <div class="skeleton-container">
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- ==============================================================
-                 Tab 4: Interactive Workflow & DAG Visualizer
+                 Tab 4: Interactive Workflow & DAG Visualizer (Canvas & Nodes)
                  ============================================================== -->
             <section id="workflowsTab" class="tab-pane">
                 <div class="workflow-container">
                     <div class="panel-header" style="border:none; padding:0 0 16px 0;">
                         <div>
-                            <h2>Interactive Orchestration & DAG Visualizer</h2>
-                            <p class="subtext">Trace how high-level goals transform into multi-agent DAG execution plans and verified deliverables.</p>
+                            <h2>Interactive Orchestration & DAG Canvas</h2>
+                            <p class="subtext">Interactive node-based execution graph with parallel branching and deterministic verification checks.</p>
                         </div>
-                        <button class="btn btn-primary btn-sm" onclick="window.simulateDagRun()">▶ Simulate DAG Pipeline</button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary btn-sm" id="btnSimulateDag" onclick="window.simulateDagRun()">
+                                <svg class="lucide-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                <span>Simulate DAG Pipeline</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Visual Flowchart DAG -->
-                    <div class="dag-flowchart" id="dagFlowchart">
-                        <!-- Stage 1: Objective & Input -->
-                        <div class="dag-row">
-                            <div class="dag-node" id="dagNodeGoal">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon">🎯</div>
-                                    <div>
-                                        <div class="dag-node-title">Owner Goal & Inputs</div>
-                                        <span class="tag priority-high">High Priority</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    High-level objective received with security constraints, privacy tier, and operational parameters.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Input Protocol</span>
-                                    <code>JSON / Web UI / Voice</code>
-                                </div>
+                    <!-- Interactive Canvas & Inspector Split -->
+                    <div class="dag-canvas-container" id="dagCanvasContainer">
+                        <!-- SVG / Interactive Viewport -->
+                        <div class="dag-canvas-viewport" id="dagViewport">
+                            <svg class="dag-canvas-svg" id="dagSvgCanvas" viewBox="0 0 900 580">
+                                <defs>
+                                    <marker id="dagArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                        <path d="M 0 1 L 8 5 L 0 9 z" fill="#94a3b8"></path>
+                                    </marker>
+                                    <marker id="dagArrowActive" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                        <path d="M 0 1 L 8 5 L 0 9 z" fill="#2563eb"></path>
+                                    </marker>
+                                </defs>
+
+                                <!-- Edge Paths with animated dashed stroke -->
+                                <!-- Goal -> Coordinator -->
+                                <path id="dagEdge1" class="dag-edge" d="M 170 120 L 260 120" marker-end="url(#dagArrow)"></path>
+                                <!-- Coordinator -> Allocator -->
+                                <path id="dagEdge2" class="dag-edge" d="M 420 120 L 500 120" marker-end="url(#dagArrow)"></path>
+                                <!-- Allocator -> 3 Parallel Workers -->
+                                <path id="dagEdge3a" class="dag-edge" d="M 580 150 C 580 220, 220 220, 220 280" marker-end="url(#dagArrow)"></path>
+                                <path id="dagEdge3b" class="dag-edge" d="M 580 150 C 580 230, 450 230, 450 280" marker-end="url(#dagArrow)"></path>
+                                <path id="dagEdge3c" class="dag-edge" d="M 580 150 C 580 220, 680 220, 680 280" marker-end="url(#dagArrow)"></path>
+                                <!-- Workers -> Verifier -->
+                                <path id="dagEdge4a" class="dag-edge" d="M 220 340 C 220 400, 450 400, 450 430" marker-end="url(#dagArrow)"></path>
+                                <path id="dagEdge4b" class="dag-edge" d="M 450 340 L 450 430" marker-end="url(#dagArrow)"></path>
+                                <path id="dagEdge4c" class="dag-edge" d="M 680 340 C 680 400, 450 400, 450 430" marker-end="url(#dagArrow)"></path>
+                                <!-- Verifier -> Reporter -->
+                                <path id="dagEdge5" class="dag-edge" d="M 530 460 L 630 460" marker-end="url(#dagArrow)"></path>
+
+                                <!-- Node Groups -->
+                                <!-- 1. Goal Node -->
+                                <g class="dag-interactive-node" id="node-goal" onclick="window.selectDagNode('goal')" transform="translate(30, 85)">
+                                    <rect class="dag-node-box" width="140" height="70"></rect>
+                                    <text x="14" y="28" font-size="12" font-weight="700" fill="#0f172a">1. Owner Goal</text>
+                                    <text x="14" y="46" font-size="10.5" fill="#64748b">Input Payload</text>
+                                    <circle cx="120" cy="24" r="4" fill="#10b981"></circle>
+                                </g>
+
+                                <!-- 2. Coordinator Node -->
+                                <g class="dag-interactive-node" id="node-coordinator" onclick="window.selectDagNode('coordinator')" transform="translate(260, 85)">
+                                    <rect class="dag-node-box" width="160" height="70"></rect>
+                                    <text x="14" y="28" font-size="12" font-weight="700" fill="#0f172a">2. Coordinator</text>
+                                    <text x="14" y="46" font-size="10.5" fill="#64748b">DAG Decomposition</text>
+                                    <circle cx="140" cy="24" r="4" fill="#3b82f6"></circle>
+                                </g>
+
+                                <!-- 3. Resource Allocator -->
+                                <g class="dag-interactive-node" id="node-allocator" onclick="window.selectDagNode('allocator')" transform="translate(500, 85)">
+                                    <rect class="dag-node-box" width="160" height="70"></rect>
+                                    <text x="14" y="28" font-size="12" font-weight="700" fill="#0f172a">3. Allocator</text>
+                                    <text x="14" y="46" font-size="10.5" fill="#64748b">Prerequisites & Lock</text>
+                                    <circle cx="140" cy="24" r="4" fill="#3b82f6"></circle>
+                                </g>
+
+                                <!-- 4a. Worker: Software Engineer -->
+                                <g class="dag-interactive-node" id="node-worker-swe" onclick="window.selectDagNode('swe')" transform="translate(130, 280)">
+                                    <rect class="dag-node-box" width="180" height="65"></rect>
+                                    <text x="14" y="26" font-size="11.5" font-weight="700" fill="#0f172a">Software Engineer</text>
+                                    <text x="14" y="44" font-size="10" fill="#64748b">Code & AST Generation</text>
+                                    <circle cx="160" cy="22" r="4" fill="#6366f1"></circle>
+                                </g>
+
+                                <!-- 4b. Worker: Browser Use Agent -->
+                                <g class="dag-interactive-node" id="node-worker-browser" onclick="window.selectDagNode('browser')" transform="translate(360, 280)">
+                                    <rect class="dag-node-box" width="180" height="65"></rect>
+                                    <text x="14" y="26" font-size="11.5" font-weight="700" fill="#0f172a">Browser Use Agent</text>
+                                    <text x="14" y="44" font-size="10" fill="#64748b">Playwright DOM & Web</text>
+                                    <circle cx="160" cy="22" r="4" fill="#06b6d4"></circle>
+                                </g>
+
+                                <!-- 4c. Worker: Market & SEO Researcher -->
+                                <g class="dag-interactive-node" id="node-worker-seo" onclick="window.selectDagNode('seo')" transform="translate(590, 280)">
+                                    <rect class="dag-node-box" width="180" height="65"></rect>
+                                    <text x="14" y="26" font-size="11.5" font-weight="700" fill="#0f172a">Market & SEO Analyst</text>
+                                    <text x="14" y="44" font-size="10" fill="#64748b">GEO Keywords & SERP</text>
+                                    <circle cx="160" cy="22" r="4" fill="#f59e0b"></circle>
+                                </g>
+
+                                <!-- 5. Independent Verifier -->
+                                <g class="dag-interactive-node" id="node-verifier" onclick="window.selectDagNode('verifier')" transform="translate(360, 425)">
+                                    <rect class="dag-node-box" width="170" height="70"></rect>
+                                    <text x="14" y="26" font-size="12" font-weight="700" fill="#0f172a">5. Verifier (6/6 Checks)</text>
+                                    <text x="14" y="44" font-size="10" fill="#64748b">Deterministic Gate</text>
+                                    <circle cx="150" cy="22" r="4" fill="#10b981"></circle>
+                                </g>
+
+                                <!-- 6. Master Reporting -->
+                                <g class="dag-interactive-node" id="node-reporter" onclick="window.selectDagNode('reporter')" transform="translate(630, 425)">
+                                    <rect class="dag-node-box" width="170" height="70"></rect>
+                                    <text x="14" y="26" font-size="12" font-weight="700" fill="#0f172a">6. Reporting Agent</text>
+                                    <text x="14" y="44" font-size="10" fill="#64748b">Deliverable Synthesis</text>
+                                    <circle cx="150" cy="22" r="4" fill="#10b981"></circle>
+                                </g>
+                            </svg>
+
+                            <div class="dag-canvas-controls">
+                                <button onclick="window.zoomDag(1.1)" title="Zoom In">+</button>
+                                <button onclick="window.zoomDag(0.9)" title="Zoom Out">−</button>
+                                <button onclick="window.resetDagZoom()" title="Reset View">Reset</button>
                             </div>
                         </div>
 
-                        <div class="dag-connector-arrow">↓</div>
-
-                        <!-- Stage 2: Coordinator & Task Decomposer -->
-                        <div class="dag-row">
-                            <div class="dag-node" id="dagNodeCoord">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon">🧭</div>
-                                    <div>
-                                        <div class="dag-node-title">Coordinator Agent</div>
-                                        <span class="tag">/coordinator-agent</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Decomposes objective into directed acyclic graph (DAG) execution steps with explicit prerequisites.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Specialist</span>
-                                    <strong>Task Decomposer</strong>
-                                </div>
+                        <!-- Node Side Inspector -->
+                        <div class="dag-node-inspector-pane" id="dagNodeInspector">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h3 id="inspectorNodeTitle" style="font-size:14px; font-weight:700;">Coordinator Agent</h3>
+                                <span class="tag" id="inspectorNodeTag">Active</span>
                             </div>
-
-                            <div class="dag-node" id="dagNodeAlloc">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon">⚖️</div>
-                                    <div>
-                                        <div class="dag-node-title">Resource Allocator</div>
-                                        <span class="tag">/resource-allocation</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Maps DAG steps to the optimal agent blueprints and capability budgets across routing tiers.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Routing Rule</span>
-                                    <strong>Multi-Tier LLM</strong>
-                                </div>
+                            <div style="font-size:12px; color:var(--text-muted);" id="inspectorNodeDesc">
+                                Decomposes high-level objectives into directed execution steps with explicit dependency graph.
                             </div>
-                        </div>
-
-                        <div class="dag-connector-arrow">↓</div>
-
-                        <!-- Stage 3: Universal 5-Stage Agent Execution Loop Engine -->
-                        <div class="dag-row">
-                            <div class="dag-node" id="dagNodeLoop" style="border-color:var(--accent); min-width:320px;">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon" style="background:var(--blue-gradient); color:#ffffff;">⚡</div>
-                                    <div>
-                                        <div class="dag-node-title">Universal 5-Stage Agent Loop Engine</div>
-                                        <span class="tag status-running">Enforced Runtime</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    <code>1. Run Policy</code> ➔ <code>2. Think</code> ➔ <code>3. Act</code> ➔ <code>4. Observe</code> ➔ <code>5. Deterministic Code Check</code>
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Security Guarantee</span>
-                                    <strong>0 Secrets Stored in Cloud</strong>
-                                </div>
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Runtime Engine</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val" id="inspectorNodeRuntime">Local Mac · Python</span>
                             </div>
-                        </div>
-
-                        <div class="dag-connector-arrow">↓</div>
-
-                        <!-- Stage 4: Autonomous Specialist Execution Matrix -->
-                        <div class="dag-row">
-                            <div class="dag-node" id="dagNodeSoftware">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon">💻</div>
-                                    <div>
-                                        <div class="dag-node-title">Software Engineer</div>
-                                        <span class="tag">/software-engineering</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Implements backend logic, API endpoints, and runs AST syntax validation.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Runtime</span>
-                                    <code>FileSystem / Local Mac</code>
-                                </div>
+                            <div class="h6-drow">
+                                <span class="h6-drow-label">Verification Gate</span>
+                                <span class="h6-drow-lead"></span>
+                                <span class="h6-drow-val" id="inspectorNodeCheck">Enforced (Deterministic)</span>
                             </div>
-
-                            <div class="dag-node" id="dagNodeBrowser">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon">🌐</div>
-                                    <div>
-                                        <div class="dag-node-title">Browser Use Agent</div>
-                                        <span class="tag">/browser-automation</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Navigates DOM portals, extracts structured data, captures verification screenshots.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Runtime</span>
-                                    <code>Playwright / Chromium</code>
-                                </div>
-                            </div>
-
-                            <div class="dag-node" id="dagNodeResearch">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon">📊</div>
-                                    <div>
-                                        <div class="dag-node-title">Market & SEO Analyst</div>
-                                        <span class="tag">/market-seo-geo-research</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Audits crawlability, benchmark competitors, and scores regional GEO intent.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Runtime</span>
-                                    <code>Data Extraction</code>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="dag-connector-arrow">↓</div>
-
-                        <!-- Stage 5: Independent Verification & Synthesis -->
-                        <div class="dag-row">
-                            <div class="dag-node" id="dagNodeVerifier">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon" style="color:var(--success); background:var(--success-bg);">🔬</div>
-                                    <div>
-                                        <div class="dag-node-title">Independent Verifier</div>
-                                        <span class="tag status-completed">Passed 6/6 Checks</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Performs deterministic schema compliance, zero-stub assertion, and exit code validation.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Quality Seal</span>
-                                    <strong>Certified Zero Stubs</strong>
-                                </div>
-                            </div>
-
-                            <div class="dag-node" id="dagNodeReport">
-                                <div class="dag-node-header">
-                                    <div class="dag-node-icon" style="color:var(--indigo); background:var(--indigo-bg);">📑</div>
-                                    <div>
-                                        <div class="dag-node-title">Master Reporting Agent</div>
-                                        <span class="tag">/master-reporting</span>
-                                    </div>
-                                </div>
-                                <div class="dag-node-body">
-                                    Synthesizes multi-agent traces into final verified executive deliverable markdown.
-                                </div>
-                                <div class="dag-node-footer">
-                                    <span>Output</span>
-                                    <strong>Owner Deliverable</strong>
-                                </div>
+                            <div style="margin-top:8px;">
+                                <span style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Live Node Telemetry</span>
+                                <pre id="inspectorNodeLogs" style="background:var(--bg-body); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px; font-size:11px; font-family:'JetBrains Mono',monospace; max-height:180px; overflow-y:auto; margin-top:4px;">Ready for simulation</pre>
                             </div>
                         </div>
                     </div>
@@ -591,213 +600,288 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 5: Sovereign Credentials Vault
+                 Tab 5: Agent Connectors & Tools Panel (NEW)
+                 ============================================================== -->
+            <section id="connectorsTab" class="tab-pane">
+                <div class="connectors-container">
+                    <div class="panel-header" style="border:none; padding:0 0 16px 0;">
+                        <div>
+                            <h2>Agent Connectors & Tools</h2>
+                            <p class="subtext">Enable external tools, APIs, and authenticated sessions for the 32-agent workforce.</p>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="window.refreshConnectors()">
+                                <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Connectors Stats Bar -->
+                    <div class="compact-telemetry-strip" style="margin-bottom:0;">
+                        <div class="telemetry-item">
+                            <span class="status-dot dot-emerald"></span>
+                            <span>Registered Tools: <strong>8 Available</strong></span>
+                        </div>
+                        <div class="telemetry-divider"></div>
+                        <div class="telemetry-item">
+                            <span class="status-dot dot-emerald"></span>
+                            <span>Active Connections: <strong id="connectorsActiveCount">4 Configured</strong></span>
+                        </div>
+                        <div class="telemetry-divider"></div>
+                        <div class="telemetry-item">
+                            <span class="status-dot dot-cyan"></span>
+                            <span>Storage Vault: <strong>Local POSIX 0600 (Encrypted)</strong></span>
+                        </div>
+                        <div class="telemetry-divider"></div>
+                        <div class="telemetry-item">
+                            <span class="status-dot dot-emerald"></span>
+                            <span>Cloud Leak Protection: <strong>0 Secrets in Cloud</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Connectors Grid Container -->
+                    <div class="connectors-grid" id="connectorsGridContainer">
+                        <div class="skeleton-container">
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==============================================================
+                 Tab 6: Sovereign Credentials Vault
                  ============================================================== -->
             <section id="securityTab" class="tab-pane">
-                <div class="panel full-panel" style="padding:16px; display:flex; flex-direction:column; gap:16px;">
-                    <!-- Health Stats Row -->
-                    <div class="stats-row" id="securityStatsRow">
-                        <div class="stat-box">
-                            <span class="stat-num" id="statTotalAccounts">3</span>
-                            <span class="stat-label">Registered Accounts</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-num" style="color:var(--success);">0</span>
-                            <span class="stat-label">Cloud Secret Leaks</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-num" style="color:var(--accent);">POSIX 0600</span>
-                            <span class="stat-label">Vault Storage</span>
-                        </div>
-                        <div class="stat-box">
-                            <span class="stat-num" id="statVaultStatus" style="color:var(--success);">SECURE</span>
-                            <span class="stat-label">Vault Health</span>
-                        </div>
-                    </div>
-
-                    <!-- Sub Navigation Bar -->
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <div class="filter-pills-bar" style="padding:0;">
-                            <button class="pill-filter active" id="secSubBtnAccounts" onclick="window.switchSecuritySubTab('accounts')">Accounts Inventory</button>
-                            <button class="pill-filter" id="secSubBtnMonitoring" onclick="window.switchSecuritySubTab('monitoring')">Security Monitoring</button>
-                            <button class="pill-filter" id="secSubBtnAudit" onclick="window.switchSecuritySubTab('audit')">Audit History</button>
-                        </div>
-                        <button class="btn btn-primary" onclick="window.openNewAccountModal()">+ Add Account</button>
-                    </div>
-
-                    <!-- Subtab 1: Accounts Inventory -->
-                    <div id="secSubAccounts" class="sec-sub-pane">
-                        <div class="accounts-grid" id="accountsGridContainer">
-                            <!-- Loaded dynamically -->
+                <div class="security-container">
+                    <div class="security-posture-banner" style="background:#ffffff; border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:16px 20px; box-shadow:var(--shadow-xs); margin-bottom:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div>
+                                <h2 style="font-size:16px; font-weight:700;">Sovereign Credentials Vault (Hardware-Isolated)</h2>
+                                <p class="subtext">Fernet POSIX 0600 encrypted credentials stored exclusively on local workstation disk.</p>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-secondary btn-sm" onclick="window.runSecurityAudit()">
+                                    <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path></svg>
+                                    <span>Audit Vault</span>
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="window.openNewAccountModal()">
+                                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    <span>Add Account</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Subtab 2: Security Monitoring -->
-                    <div id="secSubMonitoring" class="sec-sub-pane" style="display:none;">
-                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
-                            <h3>Credential Health & Posture Analysis</h3>
+                    <!-- Accounts Table Panel -->
+                    <div class="panel" style="background:#ffffff; padding:20px; border-radius:var(--radius-xl); border:1px solid var(--border-color); box-shadow:var(--shadow-xs); margin-bottom:16px;">
+                        <div class="panel-header" style="border:none; padding:0 0 14px 0;">
+                            <h3>Encrypted Credentials Inventory</h3>
+                            <span class="tag" style="background:var(--success-bg); color:var(--success);">0 Cloud Leaks</span>
                         </div>
-                        <div id="securityRecommendationsContainer">
-                            <!-- Loaded dynamically -->
+                        <div class="table-responsive">
+                            <table class="data-table" id="accountsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Service Name</th>
+                                        <th>Category</th>
+                                        <th>Username / ID</th>
+                                        <th>Password / Token</th>
+                                        <th>Isolation</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="accountsTableBody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <!-- Subtab 3: Audit History -->
-                    <div id="secSubAudit" class="sec-sub-pane" style="display:none;">
-                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
-                            <h3>Credential Access Audit Trail</h3>
-                            <span class="subtext">Append-only security log</span>
+                    <!-- Credential Audit Trail -->
+                    <div class="panel" style="background:#ffffff; padding:20px; border-radius:var(--radius-xl); border:1px solid var(--border-color); box-shadow:var(--shadow-xs);">
+                        <div class="panel-header" style="border:none; padding:0 0 14px 0;">
+                            <h3>Append-Only Credential Access Audit Trail</h3>
+                            <span class="subtext">Deterministic cryptographic log of every credential decryption request</span>
                         </div>
-                        <div class="event-stream" id="securityAuditLogContainer">
-                            <!-- Loaded dynamically -->
+                        <div class="table-responsive">
+                            <table class="data-table" id="securityAuditTable">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Caller Agent</th>
+                                        <th>Resource Requested</th>
+                                        <th>Scope</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="securityAuditBody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- ==============================================================
-                 Tab 6: LLM & Models Inference Catalog
+                 Tab 7: LLM & Models Management
                  ============================================================== -->
             <section id="modelsTab" class="tab-pane">
-                <div class="panel full-panel" style="padding:16px; display:flex; flex-direction:column; gap:20px;">
-                    <!-- Reasoning Status Banner -->
-                    <div class="kpi-card" style="border-left:4px solid var(--accent);">
-                        <div class="kpi-icon">🧠</div>
-                        <div class="kpi-content">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                                <div>
-                                    <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">
-                                        Reasoning Engine: <span id="reasoningStatusBadge" class="badge online">Active Hybrid Routing</span>
-                                    </h3>
-                                    <p style="font-size:12.5px; color:var(--text-muted); margin:0;" id="reasoningNoticeText">
-                                        Multi-tier intelligent routing: Ollama (Local Sovereign) ➔ Gemini / Claude (Cloud) ➔ Deterministic Fallback.
-                                    </p>
-                                </div>
-                                <div>
-                                    <span style="font-size:12px; color:var(--text-muted);">Active Default Model:</span>
-                                    <strong style="color:var(--accent); font-size:14px; margin-left:6px;" id="activeModelLabel">gemini-2.5-flash</strong>
-                                </div>
+                <div class="models-container">
+                    <div class="panel-header" style="border:none; padding:0 0 16px 0;">
+                        <div>
+                            <h2>LLM & Provider Orchestration</h2>
+                            <p class="subtext">Multi-provider routing pipeline with local offline fallbacks and latency monitoring.</p>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="window.refreshModels()">
+                            <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            <span>Refresh Providers</span>
+                        </button>
+                    </div>
+
+                    <!-- Routing Pipeline Visual Card -->
+                    <div class="panel" style="background:#ffffff; border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:18px 20px; box-shadow:var(--shadow-xs); margin-bottom:16px;">
+                        <h3 style="font-size:14px; font-weight:700; margin-bottom:10px;">Deterministic Model Routing Cascade</h3>
+                        <div class="compact-telemetry-strip" style="background:var(--bg-body); border-style:dashed;">
+                            <div class="telemetry-item">
+                                <span class="status-dot dot-emerald"></span>
+                                <span>Tier 1: <strong>Ollama Local Sovereign (Llama 3)</strong></span>
+                            </div>
+                            <div class="telemetry-divider"></div>
+                            <div class="telemetry-item">
+                                <span class="status-dot dot-blue"></span>
+                                <span>Tier 2 (Active): <strong>Gemini 2.5 Flash / Claude</strong></span>
+                            </div>
+                            <div class="telemetry-divider"></div>
+                            <div class="telemetry-item">
+                                <span class="status-dot dot-cyan"></span>
+                                <span>Tier 3: <strong>Deterministic AST & Code Fallback</strong></span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Inference Providers -->
-                    <div>
-                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
-                            <h2>Inference Providers</h2>
-                            <span class="subtext">Local inference daemons and cloud model APIs</span>
-                        </div>
-                        <div class="agent-grid" id="providerGridContainer">
-                            <!-- Loaded dynamically -->
-                        </div>
+                    <!-- Providers Health Grid -->
+                    <div class="providers-grid" id="providersGridContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-bottom:16px;">
+                        <!-- Populated dynamically -->
                     </div>
 
                     <!-- Registered Models Catalog -->
-                    <div>
-                        <div class="panel-header" style="border:none; padding:0 0 12px 0;">
-                            <h2>Registered Models Catalog</h2>
-                            <span class="subtext">Models available for task routing and capability execution</span>
+                    <div class="panel" style="background:#ffffff; padding:20px; border-radius:var(--radius-xl); border:1px solid var(--border-color); box-shadow:var(--shadow-xs);">
+                        <div class="panel-header" style="border:none; padding:0 0 14px 0;">
+                            <h3>Registered LLM Models Catalog</h3>
                         </div>
-                        <div class="agent-grid" id="modelsGridContainer">
-                            <!-- Loaded dynamically -->
+                        <div class="table-responsive">
+                            <table class="data-table" id="modelsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Model ID</th>
+                                        <th>Provider</th>
+                                        <th>Category</th>
+                                        <th>Default Route</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modelsTableBody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- ==============================================================
-                 Tab 7: System Integrator
+                 Tab 8: System Integrator & Requirements (Split Layout)
                  ============================================================== -->
             <section id="integratorTab" class="tab-pane">
                 <div class="split-view">
-                    <div class="panel">
+                    <!-- Left: Incoming Assets & Knowledge -->
+                    <div class="panel list-panel" style="flex:1.2;">
                         <div class="panel-header">
                             <div>
                                 <h2>Incoming Capabilities Queue</h2>
-                                <p class="subtext">Source directory: <code>~/AI-Workforce/incoming/</code></p>
+                                <span class="subtext">Auto-scan ~/AI-Workforce/incoming/ for new capabilities</span>
                             </div>
-                            <button class="btn btn-primary btn-sm" onclick="window.scanIncomingAssets()">🔍 Scan Incoming</button>
+                            <button class="btn btn-secondary btn-sm" onclick="window.scanIncomingAssets()">
+                                <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                <span>Scan Incoming</span>
+                            </button>
                         </div>
-                        <div class="asset-list" id="incomingAssetsContainer" style="padding:16px;">
-                            <div class="empty-state">No incoming assets currently waiting. Click "Scan Incoming" to check.</div>
+                        <div style="padding:16px;">
+                            <h4 style="font-size:13px; font-weight:700; margin-bottom:8px;">Operational Knowledge Documents</h4>
+                            <div class="knowledge-links" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+                                <button class="btn btn-secondary btn-sm" onclick="window.showKnowledgeDoc('INSTALLED_ASSETS.md')">INSTALLED_ASSETS.md</button>
+                                <button class="btn btn-secondary btn-sm" onclick="window.showKnowledgeDoc('AGENT_ROLE_STANDARDS.md')">AGENT_ROLE_STANDARDS.md</button>
+                                <button class="btn btn-secondary btn-sm" onclick="window.showKnowledgeDoc('CAPABILITIES.md')">CAPABILITIES.md</button>
+                            </div>
+                            <div id="docContentArea" style="background:var(--bg-body); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:16px; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; max-height:360px; overflow-y:auto;">
+                                Loading operational registry...
+                            </div>
                         </div>
                     </div>
 
-                    <div class="panel">
+                    <!-- Right: Submit System Requirement -->
+                    <div class="panel detail-panel" style="flex:0.8;">
                         <div class="panel-header">
-                            <h2>Operational Knowledge & Active Registry</h2>
-                        </div>
-                        <div class="knowledge-viewer" id="knowledgeViewerContainer" style="padding:16px;">
-                            <div class="filter-pills-bar" style="margin-bottom:12px;">
-                                <button class="pill-filter active" onclick="window.showKnowledgeDoc('INSTALLED_ASSETS.md')">Installed Assets</button>
-                                <button class="pill-filter" onclick="window.showKnowledgeDoc('AVAILABLE_CAPABILITIES.md')">Capabilities</button>
-                                <button class="pill-filter" onclick="window.showKnowledgeDoc('SKILLS_INDEX.md')">Skills Index</button>
-                                <button class="pill-filter" onclick="window.showKnowledgeDoc('AGENT_TOOL_ACCESS.json')">Agent Tool Access</button>
-                            </div>
-                            <div class="doc-content" id="docContentArea" style="background:var(--bg-subtle); padding:16px; border-radius:var(--radius-md); font-family:var(--font-mono); font-size:12px; max-height:400px; overflow-y:auto;">
-                                <pre>Loading operational knowledge...</pre>
+                            <div>
+                                <h2>Submit Requirement</h2>
+                                <span class="subtext">Evaluate & Propose Change Plan</span>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ==============================================================
-                 Tab 8: Requirements Engine
-                 ============================================================== -->
-            <section id="requirementsTab" class="tab-pane">
-                <div class="split-view">
-                    <div class="panel" style="padding:20px;">
-                        <div class="panel-header" style="border:none; padding:0 0 16px 0;">
-                            <h2>Submit System Requirement</h2>
-                        </div>
-                        <form id="requirementForm" onsubmit="window.submitRequirement(event)">
-                            <div class="form-group">
-                                <label>Category</label>
-                                <select id="reqCategory" class="input-field">
-                                    <option value="agent">New Agent / Department</option>
-                                    <option value="specialist">New Specialist Subagent</option>
-                                    <option value="model">Model Provider Endpoint</option>
-                                    <option value="permission">Permission & Approval Policy</option>
-                                    <option value="workflow">Workflow Definition</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Requirement Title</label>
-                                <input type="text" id="reqTitle" class="input-field" placeholder="e.g. Data Science & Analytics Agent" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Specification (JSON)</label>
-                                <textarea id="reqSpec" class="input-field" rows="6" style="font-family:var(--font-mono); font-size:12px;">{\n  "name": "Data Analyst Agent",\n  "department": "Analytics & Intelligence",\n  "role": "Quantitative Analyst",\n  "capabilities": ["sql_querying", "data_visualization"]\n}</textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Evaluate & Propose Change Plan</button>
-                        </form>
-                    </div>
-
-                    <div class="panel" style="padding:20px;">
-                        <div class="panel-header" style="border:none; padding:0 0 16px 0;">
-                            <h2>Requirements & Change History</h2>
-                        </div>
-                        <div class="requirements-list" id="requirementsListContainer">
-                            <div class="empty-state">No requirements evaluated yet.</div>
+                        <div style="padding:16px;">
+                            <form onsubmit="window.submitRequirement(event)">
+                                <div class="form-group">
+                                    <label>Requirement Title</label>
+                                    <input type="text" id="reqTitleInput" class="input-field" placeholder="e.g. Integrate Playwright Telemetry into Browser Agent" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Priority</label>
+                                    <select id="reqPriorityInput" class="input-field">
+                                        <option value="CRITICAL">Critical</option>
+                                        <option value="HIGH" selected>High</option>
+                                        <option value="MEDIUM">Medium</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>System Proposal Specification (JSON)</label>
+                                    <textarea id="reqDescInput" class="input-field" rows="8" style="font-family:'JetBrains Mono',monospace; font-size:12px;" required>{
+  "target_layer": "browser_automation",
+  "change_type": "capability_extension",
+  "affected_agents": ["browser-use-agent", "coordinator"],
+  "deterministic_check": "assert_dom_tree_valid"
+}</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width:100%;">Evaluate & Propose Change Plan</button>
+                            </form>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- ==============================================================
-                 Tab 9: System Execution Event Log
+                 Tab 9: Event Audit Trail
                  ============================================================== -->
             <section id="eventsTab" class="tab-pane">
                 <div class="panel full-panel" style="padding:20px;">
                     <div class="panel-header" style="border:none; padding:0 0 16px 0;">
                         <div>
-                            <h2>System Execution Audit Log</h2>
-                            <p class="subtext">Real-time immutable audit trail from <code>execution_events</code></p>
+                            <h2>System Event Audit Trail</h2>
+                            <p class="subtext">Real-time immutable audit stream of agent executions, tool handshakes, and verification decisions.</p>
                         </div>
+                        <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()">
+                            <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                            <span>Refresh Stream</span>
+                        </button>
                     </div>
                     <div class="event-stream" id="globalEventStreamContainer" style="display:flex; flex-direction:column; gap:8px;">
-                        <div class="empty-state">Loading system events...</div>
+                        <div class="skeleton-container">
+                            <div class="skeleton-row"></div>
+                            <div class="skeleton-row"></div>
+                            <div class="skeleton-row"></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -807,96 +891,101 @@
     <!-- Mobile Bottom Navigation Bar -->
     <nav class="mobile-bottom-nav">
         <button class="mobile-nav-item active" data-tab="home">
-            <span class="icon">💬</span>
+            <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
             <span>Home</span>
         </button>
         <button class="mobile-nav-item" data-tab="projects">
-            <span class="icon">📁</span>
+            <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
             <span>Projects</span>
         </button>
         <button class="mobile-nav-item" data-tab="tasks">
-            <span class="icon">📋</span>
+            <svg class="lucide-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="6" height="6" rx="1"></rect><path d="m3 17 2 2 4-4"></path><path d="M13 6h8"></path><path d="M13 12h8"></path><path d="M13 18h8"></path></svg>
             <span>Tasks</span>
         </button>
-        <button class="mobile-nav-item" data-tab="workflows">
-            <span class="icon">⚡</span>
-            <span>Workflow</span>
-        </button>
         <button class="mobile-nav-item" data-tab="agents">
-            <span class="icon">🤖</span>
+            <svg class="lucide-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg>
             <span>Agents</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="connectors">
+            <svg class="lucide-icon" viewBox="0 0 24 24"><path d="M12 22v-5"></path><path d="M9 8V2"></path><path d="M15 8V2"></path><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"></path></svg>
+            <span>Tools</span>
         </button>
     </nav>
 
+    <!-- ==============================================================
+         Modals
+         ============================================================== -->
     <!-- Create Project Modal -->
     <div id="newProjectModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Create New Project</h3>
-                <button class="close-btn" onclick="window.closeNewProjectModal()">✕</button>
+                <h3>Create New Project Workspace</h3>
+                <button class="close-btn" onclick="window.closeNewProjectModal()">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             <form onsubmit="window.handleCreateProject(event)">
                 <div class="form-group">
                     <label>Project Name</label>
-                    <input type="text" id="projNameInput" class="input-field" placeholder="e.g. Automated E-Commerce Competitor Monitor" required>
+                    <input type="text" id="projNameInput" class="input-field" placeholder="e.g. Autonomous SEO & Growth Engine" required>
                 </div>
                 <div class="form-group">
                     <label>Category</label>
                     <select id="projCategoryInput" class="input-field">
-                        <option value="engineering">Engineering & Architecture</option>
-                        <option value="market_research">Market & SEO Research</option>
-                        <option value="browser_automation">Browser Automation & Extraction</option>
-                        <option value="growth_marketing">Growth & Marketing</option>
-                        <option value="core_infrastructure">Core OS Infrastructure</option>
-                        <option value="general">General Operations</option>
+                        <option value="core_infrastructure">Engineering & Core Infra</option>
+                        <option value="market_research">Intelligence & SEO Research</option>
+                        <option value="browser_automation">Browser Automation & Telemetry</option>
+                        <option value="growth">Marketing & Audience Growth</option>
+                        <option value="operations">Governance & Operations</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Lead Agent</label>
                     <select id="projLeadAgentInput" class="input-field">
-                        <option value="coordinator">Coordinator Agent (Operations & DAG Planning)</option>
-                        <option value="software-engineer">Software Engineer (Backend / Frontend)</option>
-                        <option value="browser-use-agent">Browser Use Agent (Web Navigation & Scraping)</option>
-                        <option value="market-seo-geo-researcher">Market, SEO & GEO Researcher</option>
-                        <option value="marketing-agent">Marketing Agent (Conversion & Copy)</option>
-                        <option value="deployment-agent">Deployment Agent (Release & Infrastructure)</option>
-                        <option value="master-reporting-agent">Master Reporting Agent (Audit Synthesis)</option>
+                        <option value="coordinator">Coordinator Agent</option>
+                        <option value="software-engineer">Software Engineer</option>
+                        <option value="browser-use-agent">Browser Use Agent</option>
+                        <option value="market-seo-geo-researcher">Market & SEO Analyst</option>
+                        <option value="deployment-agent">Deployment Agent</option>
+                        <option value="master-reporting-agent">Master Reporting Agent</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Project Description & Scope</label>
-                    <textarea id="projDescInput" class="input-field" rows="3" placeholder="Define the primary objective, deliverables, and operational scope..." required></textarea>
+                    <label>Description & Scope</label>
+                    <textarea id="projDescInput" class="input-field" rows="3" placeholder="Define the milestone objectives, deliverables, and autonomy boundaries..."></textarea>
                 </div>
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button type="button" class="btn btn-secondary" onclick="window.closeNewProjectModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Project</button>
+                    <button type="submit" class="btn btn-primary">Create Workspace</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Create Task / Assign Task Modal -->
+    <!-- Dispatch Task Modal -->
     <div id="newTaskModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="newTaskModalTitle">Assign Task to Project</h3>
-                <button class="close-btn" onclick="window.closeNewTaskModal()">✕</button>
+                <h3>Dispatch Autonomous Task</h3>
+                <button class="close-btn" onclick="window.closeNewTaskModal()">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             <form onsubmit="window.handleCreateTask(event)">
                 <div class="form-group">
-                    <label>Target Project</label>
-                    <select id="taskProjectInput" class="input-field">
+                    <label>Task Title</label>
+                    <input type="text" id="taskTitleInput" class="input-field" placeholder="e.g. Run competitive SERP scan for target keywords" required>
+                </div>
+                <div class="form-group">
+                    <label>Target Project Workspace</label>
+                    <select id="taskProjectSelectModal" class="input-field">
                         <!-- Populated dynamically -->
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Task Title</label>
-                    <input type="text" id="taskTitleInput" class="input-field" placeholder="e.g. Implement user authentication and session broker" required>
-                </div>
-                <div class="form-group">
-                    <label>Assigned Core Agent</label>
+                    <label>Assigned Agent</label>
                     <select id="taskAgentInput" class="input-field">
-                        <option value="coordinator">Coordinator Agent (Operations & Orchestration)</option>
+                        <option value="coordinator">Coordinator Agent (Decomposition & Routing)</option>
                         <option value="software-engineer">Software Engineer Agent (Engineering & Architecture)</option>
                         <option value="browser-use-agent">Browser Use Agent (Browser Automation)</option>
                         <option value="market-seo-geo-researcher">Market, SEO & GEO Researcher</option>
@@ -926,12 +1015,77 @@
         </div>
     </div>
 
+    <!-- Configure Connector Modal -->
+    <div id="configureConnectorModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="confConnectorModalTitle">Configure Connector</h3>
+                <button class="close-btn" onclick="window.closeConfigureConnectorModal()">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <form onsubmit="window.handleSaveConnector(event)">
+                <input type="hidden" id="confConnectorId">
+                <div class="form-group">
+                    <label>Authentication & Token</label>
+                    <input type="password" id="confConnectorAuth" class="input-field" placeholder="Enter API Key / Token / Service Account JSON..." required>
+                    <span style="font-size:11px; color:var(--text-muted); margin-top:4px; display:block;">Credentials will be encrypted with local Fernet vault on MacBook Pro.</span>
+                </div>
+                <div class="form-group">
+                    <label>Assigned Workforce Agents</label>
+                    <div id="confConnectorAgentsChecklist" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto; background:var(--bg-body); padding:10px; border:1px solid var(--border-color); border-radius:var(--radius-md);">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                    <button type="button" class="btn btn-secondary" id="btnTestConnectorModal" onclick="window.testConnectorFromModal()">Test Handshake</button>
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" class="btn btn-secondary" onclick="window.closeConfigureConnectorModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save & Connect</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Agent Blueprints Drawer Modal -->
+    <div id="agentBlueprintModal" class="modal-overlay">
+        <div class="modal blueprint-drawer-modal">
+            <div class="modal-header">
+                <div>
+                    <h3 id="bpAgentName">Agent Blueprint</h3>
+                    <span class="subtext" id="bpAgentRole">Universal 3-File Standard</span>
+                </div>
+                <button class="close-btn" onclick="window.closeAgentBlueprintModal()">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="blueprint-tabs-bar">
+                <button class="blueprint-tab-btn active" id="bpTabAgent" onclick="window.switchBlueprintTab('agent')">AGENT.md</button>
+                <button class="blueprint-tab-btn" id="bpTabSkill" onclick="window.switchBlueprintTab('skill')">SKILL.md</button>
+                <button class="blueprint-tab-btn" id="bpTabMemory" onclick="window.switchBlueprintTab('memory')">MEMORY.md</button>
+            </div>
+            <div class="blueprint-content-viewer" id="blueprintContentViewer">
+                Loading agent blueprint files...
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                <span class="tag" style="background:var(--bg-blue-subtle); color:var(--accent);" id="bpAgentIdTag">/coordinator</span>
+                <button class="btn btn-primary btn-sm" id="btnPromptThisAgent" onclick="window.promptThisAgentFromModal()">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <span>Prompt This Agent</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Account Modal -->
     <div id="newAccountModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
                 <h3>Add Vault Account</h3>
-                <button class="close-btn" onclick="window.closeNewAccountModal()">✕</button>
+                <button class="close-btn" onclick="window.closeNewAccountModal()">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             <form onsubmit="window.handleCreateAccount(event)">
                 <div class="form-group">
@@ -969,18 +1123,18 @@
         </div>
     </div>
 
-    <!-- ==============================================================
-         FounderOS-Inspired Command Palette (Cmd+K / Ctrl+K)
-         ============================================================== -->
+    <!-- Command Palette (Cmd+K / Ctrl+K) -->
     <div id="commandPaletteModal" class="palette-backdrop" onclick="window.handlePaletteBackdropClick(event)">
         <div class="palette-modal" onclick="event.stopPropagation()">
             <div class="palette-search-wrapper">
-                <span class="palette-search-icon">🔍</span>
-                <input type="text" id="paletteSearchInput" class="palette-search-input" placeholder="Type an agent name, project, command, or view..." autocomplete="off">
+                <span class="palette-search-icon">
+                    <svg class="lucide-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </span>
+                <input type="text" id="paletteSearchInput" class="palette-search-input" placeholder="Type an agent name, project, connector, command, or view..." autocomplete="off">
                 <kbd style="font-size:11px; color:var(--text-muted); background:var(--bg-subtle); padding:2px 6px; border-radius:4px; border:1px solid var(--border-color);">ESC</kbd>
             </div>
             <div class="palette-results" id="paletteResultsList">
-                <!-- Dynamically populated from 32 agents, projects, navigation, and actions -->
+                <!-- Dynamically populated -->
             </div>
             <div class="palette-footer">
                 <div class="palette-hints">
@@ -988,7 +1142,7 @@
                     <span><kbd>↵</kbd> Select</span>
                     <span><kbd>esc</kbd> Dismiss</span>
                 </div>
-                <span>⚡ AI Workforce Command Palette</span>
+                <span>AI Workforce Command Palette</span>
             </div>
         </div>
     </div>
