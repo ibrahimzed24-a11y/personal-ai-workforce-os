@@ -10,6 +10,10 @@
 *.pfx
 .ai_workforce_vault.key
 
+# Node & JavaScript Dependencies
+node_modules/
+.npm/
+
 # Python Virtual Environments & Packages
 .venv/
 venv/
