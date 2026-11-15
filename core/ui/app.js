@@ -7,6 +7,8 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 let session = null;
 let projects = [];
 let activeProjectId = null;
+let projectDocuments = [];
+let inspectingDoc = null;
 let workerOnline = false;
 let isSignUpMode = false;
 
@@ -25,15 +27,27 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
 async function apiFetch(path, options = {}) {
   const token = session?.access_token || SUPABASE_ANON_KEY;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    ...(options.headers || {}),
+  };
+  // Don't set Content-Type for FormData
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
   const res = await fetch(path, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
+    headers,
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || 'Request failed');
@@ -116,18 +130,260 @@ window.selectProject = async function (id) {
 async function loadActiveWorkspace() {
   if (!activeProjectId) return;
   try {
-    const [ws, vault] = await Promise.all([
+    const [ws, vault, docs] = await Promise.all([
       apiFetch(`/api/projects/${activeProjectId}/workspace`),
       apiFetch(`/api/projects/${activeProjectId}/vault`),
+      apiFetch(`/api/projects/${activeProjectId}/documents`),
     ]);
+    projectDocuments = docs.documents || [];
     renderChat(ws.messages || []);
     renderReports(ws.runs || []);
     renderVault(vault.tools || []);
+    renderDocuments(projectDocuments);
+    updateHarnessBanner(projectDocuments);
   } catch (err) {
     showToast(err.message);
   }
 }
 
+// --- Core Data Documents & Harness ---
+function updateHarnessBanner(docs) {
+  const bar = document.getElementById('chat-harness-bar');
+  const text = document.getElementById('chat-harness-text');
+  const badge = document.getElementById('doc-count-badge');
+
+  if (badge) {
+    badge.textContent = `${docs.length} Core File${docs.length === 1 ? '' : 's'} Attached`;
+  }
+
+  if (!bar || !text) return;
+
+  if (docs.length === 0) {
+    bar.classList.add('hidden');
+    return;
+  }
+
+  bar.classList.remove('hidden');
+  const names = docs.map((d) => d.file_name).slice(0, 2).join(', ');
+  const extra = docs.length > 2 ? ` (+${docs.length - 2} more)` : '';
+  text.textContent = `Core Data Harness Active: ${names}${extra}`;
+}
+
+function renderDocuments(docs) {
+  const container = document.getElementById('documents-list');
+  if (!container) return;
+
+  if (docs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-card" style="padding:1.75rem;">
+        <p class="subtext" style="margin:0;">No core files attached to this project yet. Drag & drop lead spreadsheets (.csv, .xlsx) or PDF guidelines above so your agents can access them.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = docs
+    .map((d) => {
+      const ext = (d.file_type || 'txt').toLowerCase();
+      let badgeClass = 'doc-badge-txt';
+      let iconText = ext.toUpperCase();
+      if (ext === 'pdf') badgeClass = 'doc-badge-pdf';
+      else if (ext === 'csv') badgeClass = 'doc-badge-csv';
+      else if (ext === 'xlsx' || ext === 'xls') {
+        badgeClass = 'doc-badge-xlsx';
+        iconText = 'XLS';
+      }
+
+      const metaParts = [formatBytes(d.file_size)];
+      if (d.row_count !== null && d.row_count !== undefined) {
+        metaParts.push(`${d.row_count} records`);
+      }
+      if (d.page_count !== null && d.page_count !== undefined) {
+        metaParts.push(`${d.page_count} pages`);
+      }
+      if (d.columns && d.columns.length > 0) {
+        metaParts.push(`${d.columns.length} columns`);
+      }
+
+      return `
+      <div class="doc-card">
+        <div class="doc-info">
+          <div class="doc-icon-badge ${badgeClass}">${iconText}</div>
+          <div>
+            <div class="doc-title">${escapeHtml(d.file_name)}</div>
+            <div class="doc-meta">
+              <span>${metaParts.join(' • ')}</span>
+            </div>
+          </div>
+        </div>
+        <div class="doc-actions">
+          <button class="btn-secondary small" onclick="inspectDoc('${d.id}')">Inspect Data</button>
+          <button class="btn-secondary small" onclick="askTeamAboutDoc('${d.id}', '${escapeHtml(d.file_name)}')">Ask Team</button>
+          <button class="btn-danger" onclick="removeDoc('${d.id}')">Remove</button>
+        </div>
+      </div>`;
+    })
+    .join('');
+}
+
+window.inspectDoc = async function (docId) {
+  try {
+    const data = await apiFetch(`/api/projects/${activeProjectId}/documents/${docId}`);
+    const doc = data.document;
+    inspectingDoc = doc;
+
+    const modal = document.getElementById('dataset-modal');
+    document.getElementById('dataset-modal-title').textContent = doc.file_name;
+
+    const metaParts = [formatBytes(doc.file_size)];
+    if (doc.row_count !== null) metaParts.push(`${doc.row_count} total records`);
+    if (doc.page_count !== null) metaParts.push(`${doc.page_count} pages`);
+    document.getElementById('dataset-modal-subtitle').textContent = metaParts.join(' • ');
+
+    const colsBar = document.getElementById('dataset-columns-bar');
+    if (doc.columns && doc.columns.length > 0) {
+      colsBar.innerHTML = doc.columns
+        .map((c) => `<span class="step-chip" style="font-size:0.75rem;">${escapeHtml(c)}</span>`)
+        .join('');
+    } else {
+      colsBar.innerHTML = '';
+    }
+
+    const contentBox = document.getElementById('dataset-modal-content');
+    contentBox.textContent = doc.extracted_text || 'No text extracted.';
+
+    modal.classList.remove('hidden');
+  } catch (err) {
+    showToast(err.message);
+  }
+};
+
+window.askTeamAboutDoc = function (docId, fileName) {
+  document.querySelector('button[data-tab="chat"]').click();
+  const input = document.getElementById('chat-input');
+  if (input) {
+    input.value = `Using our core data file «${fileName}», please review the records and `;
+    input.focus();
+  }
+};
+
+window.downloadDoc = async function (docId, fileName) {
+  try {
+    const data = await apiFetch(`/api/projects/${activeProjectId}/documents/${docId}`);
+    const b64 = data.document?.file_data_base64;
+    if (!b64) return showToast('File payload not available for download.');
+
+    const a = document.createElement('a');
+    a.href = `data:application/octet-stream;base64,${b64}`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    showToast(err.message);
+  }
+};
+
+window.removeDoc = async function (docId) {
+  if (!confirm('Remove this core data file from the project harness?')) return;
+  try {
+    await apiFetch(`/api/projects/${activeProjectId}/documents/${docId}`, { method: 'DELETE' });
+    await loadActiveWorkspace();
+  } catch (err) {
+    showToast(err.message);
+  }
+};
+
+async function uploadFileList(files) {
+  if (!activeProjectId) return showToast('Select or create a project first.');
+  const statusEl = document.getElementById('upload-status');
+  statusEl.classList.remove('hidden');
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    statusEl.textContent = `Uploading & parsing ${file.name} (${i + 1}/${files.length})...`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      await apiFetch(`/api/projects/${activeProjectId}/documents/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+    } catch (err) {
+      showToast(`Error uploading ${file.name}: ${err.message}`);
+    }
+  }
+
+  statusEl.textContent = `Upload complete! Grounding agents in ${files.length} new core files.`;
+  setTimeout(() => statusEl.classList.add('hidden'), 3500);
+  await loadActiveWorkspace();
+}
+
+// Drag & Drop Listeners
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('doc-file-input');
+
+if (dropZone && fileInput) {
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    });
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      uploadFileList(files);
+    }
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      uploadFileList(e.target.files);
+      e.target.value = '';
+    }
+  });
+}
+
+// Modal Handlers
+const closeDatasetBtn = document.getElementById('close-dataset-modal-btn');
+if (closeDatasetBtn) {
+  closeDatasetBtn.addEventListener('click', () => {
+    document.getElementById('dataset-modal').classList.add('hidden');
+    inspectingDoc = null;
+  });
+}
+
+const askTeamFileBtn = document.getElementById('ask-team-about-file-btn');
+if (askTeamFileBtn) {
+  askTeamFileBtn.addEventListener('click', () => {
+    if (inspectingDoc) {
+      document.getElementById('dataset-modal').classList.add('hidden');
+      askTeamAboutDoc(inspectingDoc.id, inspectingDoc.file_name);
+    }
+  });
+}
+
+const downloadFileBtn = document.getElementById('download-file-btn');
+if (downloadFileBtn) {
+  downloadFileBtn.addEventListener('click', () => {
+    if (inspectingDoc) {
+      downloadDoc(inspectingDoc.id, inspectingDoc.file_name);
+    }
+  });
+}
+
+// --- Chat, Reports, Vault ---
 function renderChat(messages) {
   const feed = document.getElementById('chat-feed');
   if (!feed) return;
@@ -135,7 +391,7 @@ function renderChat(messages) {
     feed.innerHTML = `
       <div class="empty-card">
         <h3>Talk to your project team</h3>
-        <p>Write a task in plain English or Egyptian Arabic (اتكلم بالمصري أو بالإنجليزي). Your Lead Coordinator will execute the workflow and generate an Admin Report.</p>
+        <p>Write a task in plain English or Egyptian Arabic (اتكلم بالمصري أو بالإنجليزي). Your Lead Coordinator will execute the workflow using your uploaded core files and generate an Admin Report.</p>
       </div>`;
     return;
   }
@@ -324,7 +580,7 @@ window.inspectAgent = async function (agentId, agentName) {
   }
 };
 
-// --- Event Listeners ---
+// --- Navigation Tabs ---
 document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -345,6 +601,7 @@ if (closeAgentBtn) {
   });
 }
 
+// --- Auth Event Listeners ---
 document.getElementById('auth-toggle').addEventListener('click', () => {
   isSignUpMode = !isSignUpMode;
   document.getElementById('auth-submit').textContent = isSignUpMode ? 'Create Account' : 'Sign in';
@@ -377,7 +634,6 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
   if (data?.session) {
     startApp(data.session);
   } else if (data?.user) {
-    // If autoconfirmed, try sign in
     const signInRes = await sb.auth.signInWithPassword({ email, password });
     if (signInRes.data?.session) {
       startApp(signInRes.data.session);

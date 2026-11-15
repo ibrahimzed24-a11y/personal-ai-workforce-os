@@ -1,5 +1,7 @@
 import os
 import sys
+import io
+import csv
 import base64
 import hashlib
 import time
@@ -10,7 +12,7 @@ from typing import Optional, Dict, Any, List
 
 import httpx
 from cryptography.fernet import Fernet
-from fastapi import FastAPI, Depends, HTTPException, Header, Request
+from fastapi import FastAPI, Depends, HTTPException, Header, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -76,6 +78,118 @@ def encrypt_secret(plain: str) -> str:
     return get_cipher().encrypt(plain.encode("utf-8")).decode("utf-8")
 
 
+# --- Document & Harness File Parsing ---
+def parse_project_file(file_name: str, raw_bytes: bytes) -> Dict[str, Any]:
+    ext = file_name.split(".")[-1].lower() if "." in file_name else "txt"
+    row_count = None
+    page_count = None
+    columns = []
+    sample_rows = []
+    extracted_text = ""
+
+    if ext == "csv":
+        try:
+            try:
+                text_content = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                text_content = raw_bytes.decode("latin-1", errors="replace")
+
+            reader = list(csv.reader(io.StringIO(text_content)))
+            if reader:
+                columns = [str(c).strip() for c in reader[0]]
+                data_rows = reader[1:]
+                row_count = len(data_rows)
+                sample_rows = data_rows[:10]
+
+                lines = [
+                    f"# CSV Dataset: {file_name}",
+                    f"Total Records: {row_count} | Headers: {', '.join(columns)}",
+                    "",
+                    "| " + " | ".join(columns) + " |",
+                    "| " + " | ".join(["---"] * len(columns)) + " |"
+                ]
+                for r in data_rows[:40]:
+                    padded = r + [""] * (len(columns) - len(r))
+                    clean_cells = [str(cell).strip().replace("\n", " ").replace("|", "/") for cell in padded[:len(columns)]]
+                    lines.append("| " + " | ".join(clean_cells) + " |")
+                if row_count > 40:
+                    lines.append(f"\n... ({row_count - 40} additional records available in harness)")
+                extracted_text = "\n".join(lines)
+            else:
+                extracted_text = f"# CSV File: {file_name}\nFile is empty."
+                row_count = 0
+        except Exception as e:
+            extracted_text = f"# CSV File: {file_name}\nError parsing CSV: {str(e)}"
+
+    elif ext in ("xlsx", "xls"):
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(raw_bytes), data_only=True)
+            sheet_names = wb.sheetnames
+            extracted_sections = [f"# Excel Workbook: {file_name} (Sheets: {', '.join(sheet_names)})"]
+            total_rows_all = 0
+
+            for sname in sheet_names[:3]:
+                ws = wb[sname]
+                rows = list(ws.iter_rows(values_only=True))
+                if not rows:
+                    continue
+                sheet_headers = [str(c).strip() if c is not None else f"Col_{i+1}" for i, c in enumerate(rows[0])]
+                sheet_data = rows[1:]
+                total_rows_all += len(sheet_data)
+                if not columns:
+                    columns = sheet_headers
+                    sample_rows = [list(r) for r in sheet_data[:10]]
+
+                extracted_sections.append(f"## Sheet: {sname} ({len(sheet_data)} rows)")
+                extracted_sections.append("| " + " | ".join(sheet_headers) + " |")
+                extracted_sections.append("| " + " | ".join(["---"] * len(sheet_headers)) + " |")
+                for r in sheet_data[:30]:
+                    clean_cells = [str(cell if cell is not None else "").strip().replace("\n", " ").replace("|", "/") for cell in r]
+                    extracted_sections.append("| " + " | ".join(clean_cells[:len(sheet_headers)]) + " |")
+                if len(sheet_data) > 30:
+                    extracted_sections.append(f"\n... ({len(sheet_data) - 30} additional records in sheet '{sname}')")
+            row_count = total_rows_all
+            extracted_text = "\n\n".join(extracted_sections)
+        except Exception as e:
+            extracted_text = f"# Excel File: {file_name}\nError parsing XLSX: {str(e)}"
+
+    elif ext == "pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(raw_bytes))
+            page_count = len(reader.pages)
+            extracted_pages = [f"# PDF Document: {file_name} (Total Pages: {page_count})"]
+            for idx, page in enumerate(reader.pages[:20]):
+                text = page.extract_text() or ""
+                extracted_pages.append(f"--- Page {idx + 1} ---\n{text.strip()}")
+            if page_count > 20:
+                extracted_pages.append(f"\n... ({page_count - 20} more pages)")
+            extracted_text = "\n\n".join(extracted_pages)
+        except Exception as e:
+            extracted_text = f"# PDF Document: {file_name}\nError parsing PDF: {str(e)}"
+
+    else:
+        try:
+            extracted_text = raw_bytes.decode("utf-8", errors="replace")[:25000]
+        except Exception:
+            extracted_text = f"# File: {file_name}\nBinary content ({len(raw_bytes)} bytes)"
+
+    base64_str = base64.b64encode(raw_bytes).decode("ascii")
+
+    return {
+        "file_name": file_name,
+        "file_type": ext,
+        "file_size": len(raw_bytes),
+        "row_count": row_count,
+        "page_count": page_count,
+        "columns": columns,
+        "sample_rows": sample_rows,
+        "extracted_text": extracted_text,
+        "file_data_base64": base64_str,
+    }
+
+
 # --- Schemas ---
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=120)
@@ -101,6 +215,11 @@ class VaultItemCreate(BaseModel):
     username_identifier: str = Field(..., min_length=2, max_length=200)
     password_or_token: str = Field(..., min_length=1, max_length=1000)
     allowed_actions: List[str] = Field(default=["browse", "extract_data", "draft_email"])
+
+
+class DocumentBase64Upload(BaseModel):
+    file_name: str = Field(..., min_length=1, max_length=255)
+    content_base64: str = Field(..., min_length=1)
 
 
 class ChatDispatchRequest(BaseModel):
@@ -169,9 +288,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def health():
     return {
         "status": "ok",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "supabase_ready": bool(SUPABASE_URL and SUPABASE_ANON_KEY),
         "cloud_llm_ready": bool(os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")),
+        "harness_formats": ["pdf", "csv", "xlsx", "txt", "json"],
     }
 
 
@@ -233,6 +353,123 @@ async def delete_project(project_id: str, user: Dict[str, Any] = Depends(get_aut
     if res.status_code >= 400:
         raise HTTPException(status_code=res.status_code, detail=res.text)
     return {"deleted": project_id}
+
+
+# --- Project Core Documents / Files (PDF, CSV, XLSX) ---
+@app.get("/api/projects/{project_id}/documents")
+async def list_project_documents(project_id: str, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    token = user["_access_token"]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_documents?select=id,project_id,file_name,file_type,file_size,row_count,page_count,columns,sample_rows,created_at&project_id=eq.{project_id}&order=created_at.desc",
+            headers=sb_headers(token),
+        )
+    if res.status_code >= 400:
+        raise HTTPException(status_code=res.status_code, detail=res.text)
+    return {"documents": res.json()}
+
+
+@app.get("/api/projects/{project_id}/documents/{doc_id}")
+async def get_project_document(project_id: str, doc_id: str, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    token = user["_access_token"]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_documents?id=eq.{doc_id}&project_id=eq.{project_id}&limit=1",
+            headers=sb_headers(token),
+        )
+    if res.status_code >= 400 or not res.json():
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return {"document": res.json()[0]}
+
+
+@app.delete("/api/projects/{project_id}/documents/{doc_id}")
+async def delete_project_document(project_id: str, doc_id: str, user: Dict[str, Any] = Depends(get_authenticated_user)):
+    token = user["_access_token"]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.delete(
+            f"{SUPABASE_URL}/rest/v1/project_documents?id=eq.{doc_id}&user_id=eq.{user['id']}",
+            headers=sb_headers(token),
+        )
+    if res.status_code >= 400:
+        raise HTTPException(status_code=res.status_code, detail=res.text)
+    return {"deleted": doc_id}
+
+
+@app.post("/api/projects/{project_id}/documents/upload")
+async def upload_project_document(
+    project_id: str,
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(get_authenticated_user)
+):
+    token = user["_access_token"]
+    raw_bytes = await file.read()
+    if len(raw_bytes) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (maximum size is 20MB).")
+
+    parsed = parse_project_file(file.filename or "uploaded_file", raw_bytes)
+    record = {
+        "user_id": user["id"],
+        "project_id": project_id,
+        "file_name": parsed["file_name"],
+        "file_type": parsed["file_type"],
+        "file_size": parsed["file_size"],
+        "row_count": parsed["row_count"],
+        "page_count": parsed["page_count"],
+        "columns": parsed["columns"],
+        "sample_rows": parsed["sample_rows"],
+        "extracted_text": parsed["extracted_text"],
+        "file_data_base64": parsed["file_data_base64"],
+    }
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{SUPABASE_URL}/rest/v1/project_documents",
+            headers=sb_headers(token),
+            json=record,
+        )
+    if res.status_code >= 400:
+        raise HTTPException(status_code=res.status_code, detail=res.text)
+    saved = res.json()[0]
+    saved.pop("file_data_base64", None)
+    return {"document": saved}
+
+
+@app.post("/api/projects/{project_id}/documents")
+async def upload_project_document_base64(
+    project_id: str,
+    payload: DocumentBase64Upload,
+    user: Dict[str, Any] = Depends(get_authenticated_user)
+):
+    token = user["_access_token"]
+    try:
+        raw_bytes = base64.b64decode(payload.content_base64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 payload.")
+
+    parsed = parse_project_file(payload.file_name, raw_bytes)
+    record = {
+        "user_id": user["id"],
+        "project_id": project_id,
+        "file_name": parsed["file_name"],
+        "file_type": parsed["file_type"],
+        "file_size": parsed["file_size"],
+        "row_count": parsed["row_count"],
+        "page_count": parsed["page_count"],
+        "columns": parsed["columns"],
+        "sample_rows": parsed["sample_rows"],
+        "extracted_text": parsed["extracted_text"],
+        "file_data_base64": parsed["file_data_base64"],
+    }
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{SUPABASE_URL}/rest/v1/project_documents",
+            headers=sb_headers(token),
+            json=record,
+        )
+    if res.status_code >= 400:
+        raise HTTPException(status_code=res.status_code, detail=res.text)
+    saved = res.json()[0]
+    saved.pop("file_data_base64", None)
+    return {"document": saved}
 
 
 # --- Encrypted Credential Vault & Tools ---
@@ -298,20 +535,48 @@ async def get_project_workspace(project_id: str, user: Dict[str, Any] = Depends(
             f"{SUPABASE_URL}/rest/v1/pipeline_runs?select=*&project_id=eq.{project_id}&order=created_at.desc&limit=25",
             headers=sb_headers(token),
         )
+        doc_res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_documents?select=id,file_name,file_type,file_size,row_count,page_count,columns,created_at&project_id=eq.{project_id}&order=created_at.desc",
+            headers=sb_headers(token),
+        )
     return {
         "messages": msg_res.json() if msg_res.status_code == 200 else [],
         "runs": run_res.json() if run_res.status_code == 200 else [],
+        "documents": doc_res.json() if doc_res.status_code == 200 else [],
     }
 
 
 async def generate_bilingual_coordinator_reply(
     project: Dict[str, Any],
     tools: List[Dict[str, Any]],
+    documents: List[Dict[str, Any]],
     user_message: str,
     is_ar: bool,
 ) -> str:
     tool_names = ", ".join([t["tool_name"] for t in tools]) if tools else ("لا توجد أدوات مربوطة بعد" if is_ar else "No saved tools yet")
     agents_list = ", ".join(project.get("assigned_agents", []))
+
+    # Core Data Harness formatting
+    doc_lines = []
+    doc_context_blocks = []
+    for d in documents:
+        meta_items = []
+        if d.get("row_count") is not None:
+            meta_items.append(f"{d['row_count']} rows")
+        if d.get("page_count") is not None:
+            meta_items.append(f"{d['page_count']} pages")
+        if d.get("columns"):
+            meta_items.append(f"cols: {', '.join(d['columns'][:5])}")
+        meta_str = f" ({', '.join(meta_items)})" if meta_items else ""
+        doc_lines.append(f"• {d['file_name']}{meta_str}")
+
+        text_snippet = (d.get("extracted_text") or "")[:4000]
+        if text_snippet:
+            doc_context_blocks.append(f"=== File: {d['file_name']} ===\n{text_snippet}\n")
+
+    docs_summary_str = "\n".join(doc_lines) if doc_lines else ("No core data files attached yet" if not is_ar else "لا توجد ملفات داتا مرفوعة بعد")
+    harness_block = "\n".join(doc_context_blocks)
+
     lang_instruction = (
         "Reply in natural, clear Egyptian Arabic (عامية مصرية واضحة ومباشرة) as a helpful operations coordinator."
         if is_ar
@@ -322,9 +587,12 @@ async def generate_bilingual_coordinator_reply(
         f"You are the Lead Coordinator Agent for the project '{project['name']}'. "
         f"Project Goal: {project.get('goal') or 'Not specified'}. "
         f"Assigned Agents: {agents_list}. "
-        f"Authorized Saved Logins/Tools: {tool_names}. "
+        f"Authorized Saved Logins/Tools: {tool_names}. \n\n"
+        f"Core Data Harness Files:\n{docs_summary_str}\n\n"
+        f"Reference Data Extract:\n{harness_block}\n\n"
         f"{lang_instruction} "
-        "Explain clearly which agent handles each step, how the saved tools will be used (e.g., drafting emails in Gmail/Hostinger or checking Search Console), and provide a concise Admin Summary."
+        "You and your specialist agents must use the attached core files (leads, PDF specs, Excel sheets) as your authoritative ground truth. "
+        "Explain clearly which agent handles each step, how the harness data and saved tools are used, and provide a concise Admin Summary."
     )
 
     gemini_key = os.getenv("GEMINI_API_KEY", "")
@@ -365,13 +633,15 @@ async def generate_bilingual_coordinator_reply(
             f"تم استلام توجيهك لمشروع «{project['name']}».\n"
             f"• الفريق المخصص: {agents_list}\n"
             f"• الأدوات المتاحة: {tool_names}\n"
-            f"• الخطوة التالية: تم ترتيب المهام بين الـ Agents بنجاح. لتفعيل الذكاء السحابي التلقائي عندما يكون جهازك مغلقاً، أضف GEMINI_API_KEY في إعدادات Vercel."
+            f"• ملفات الداتا والهارنس المربوطة:\n{docs_summary_str}\n"
+            f"• الخطوة التالية: تم توجيه الـ Agents بالاعتماد على الداتا المرفوعة كمرجع أساسي لتنفيذ المهمة بدقة."
         )
     return (
         f"Directive received for project '{project['name']}'.\n"
         f"• Assigned Team: {agents_list}\n"
         f"• Authorized Tools: {tool_names}\n"
-        f"• Status: Sequential handoff completed. Add GEMINI_API_KEY in Vercel if you want cloud AI responses while your local MacBook worker is offline."
+        f"• Core Data Harness:\n{docs_summary_str}\n"
+        f"• Status: Sequential handoff completed using core project files as reference harness."
     )
 
 
@@ -383,7 +653,7 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
     lang = "ar" if is_ar else "en"
 
     async with httpx.AsyncClient(timeout=25.0) as client:
-        # 1. Load isolated project & its vault tools
+        # 1. Load isolated project, its vault tools & core data documents
         proj_res = await client.get(
             f"{SUPABASE_URL}/rest/v1/projects?id=eq.{payload.project_id}&limit=1",
             headers=sb_headers(token),
@@ -397,6 +667,12 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
             headers=sb_headers(token),
         )
         tools = vault_res.json() if vault_res.status_code == 200 else []
+
+        doc_res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_documents?select=file_name,file_type,file_size,row_count,page_count,columns,extracted_text&project_id=eq.{payload.project_id}&order=created_at.asc",
+            headers=sb_headers(token),
+        )
+        documents = doc_res.json() if doc_res.status_code == 200 else []
 
         # 2. Save Operator Chat Message
         await client.post(
@@ -415,12 +691,14 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
         # 3. Execute Sequential Agent Handoff Pipeline
         agents = project.get("assigned_agents") or ["coordinator", "browser-researcher", "report-compiler"]
         tool_summary = ", ".join([t["tool_name"] for t in tools]) if tools else "None"
+        doc_count = len(documents)
+        data_summary = f"{doc_count} core data files loaded ({', '.join(d['file_name'] for d in documents[:3])})" if doc_count else "No files attached"
 
         if payload.local_worker_output:
             final_reply = payload.local_worker_output
             runtime_used = "local_llm (127.0.0.1:8765)"
         else:
-            final_reply = await generate_bilingual_coordinator_reply(project, tools, payload.message.strip(), is_ar)
+            final_reply = await generate_bilingual_coordinator_reply(project, tools, documents, payload.message.strip(), is_ar)
             runtime_used = project.get("runtime_mode", "antigravity")
 
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -428,21 +706,21 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
             {
                 "step": 1,
                 "agent": agents[0] if len(agents) > 0 else "coordinator",
-                "action": "Understood directive & verified project scope",
+                "action": f"Verified project scope & checked core data harness ({data_summary})",
                 "status": "completed",
                 "timestamp": now_iso,
             },
             {
                 "step": 2,
                 "agent": agents[1] if len(agents) > 1 else "specialist",
-                "action": f"Checked authorized tools ({tool_summary}) & prepared execution",
+                "action": f"Parsed harness records & checked authorized tools ({tool_summary})",
                 "status": "completed",
                 "timestamp": now_iso,
             },
             {
                 "step": 3,
                 "agent": agents[-1] if len(agents) > 2 else "report-compiler",
-                "action": "Compiled plain-language Admin Report",
+                "action": "Compiled plain-language Admin Report grounded in core files",
                 "status": "completed",
                 "timestamp": now_iso,
             },

@@ -10,16 +10,28 @@ from typing import Dict, Any, Optional, Set
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("ai_workforce_os.hybrid_worker")
 
 PUBLIC_DIR = Path(__file__).resolve().parent.parent.parent / "public"
+
+# In-memory store for offline/local standalone mode
+LOCAL_PROJECTS = [
+    {
+        "id": "proj_valioz_health",
+        "name": "valioz health sales",
+        "goal": "draft email campaigns , schedule and send emails",
+        "runtime_mode": "antigravity",
+        "assigned_agents": ["coordinator", "browser-researcher", "email-operator", "report-compiler"],
+        "status": "active"
+    }
+]
+LOCAL_PROJECT_DOCS: Dict[str, list] = {}
 
 # --- AntiGravity & Local Ollama Bridge FastAPI App ---
 app = FastAPI(title="AntiGravity & Local Ollama Bridge", version="3.0.0")
@@ -68,6 +80,7 @@ async def health():
         "worker": "online",
         "ollama_connected": ollama_ready,
         "default_model": DEFAULT_MODEL,
+        "harness_formats": ["pdf", "csv", "xlsx", "txt", "json"],
     }
 
 
@@ -92,6 +105,125 @@ async def execute_local(req: LocalExecRequest):
             "model": req.model,
             "notice": f"Ollama status: {str(exc)}"
         }
+
+
+# --- Local Projects Endpoints ---
+@app.get("/api/projects")
+async def local_list_projects():
+    from api.index import SUPABASE_URL, SUPABASE_ANON_KEY
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                res = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/projects?select=*&order=created_at.desc",
+                    headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
+                )
+                if res.status_code == 200 and res.json():
+                    return {"projects": res.json()}
+        except Exception:
+            pass
+    return {"projects": LOCAL_PROJECTS}
+
+
+@app.post("/api/projects")
+async def local_create_project(payload: dict):
+    import uuid
+    new_p = {
+        "id": str(uuid.uuid4()),
+        "name": payload.get("name", "New Project"),
+        "goal": payload.get("goal", ""),
+        "runtime_mode": payload.get("runtime_mode", "antigravity"),
+        "assigned_agents": ["coordinator", "browser-researcher", "email-operator", "report-compiler"],
+        "status": "active"
+    }
+    LOCAL_PROJECTS.insert(0, new_p)
+    return {"project": new_p}
+
+
+@app.get("/api/projects/{project_id}/workspace")
+async def local_workspace(project_id: str):
+    return {"messages": [], "runs": [], "documents": LOCAL_PROJECT_DOCS.get(project_id, [])}
+
+
+@app.get("/api/projects/{project_id}/vault")
+async def local_vault(project_id: str):
+    return {"tools": []}
+
+
+# --- Project Documents Endpoints (Local Standalone Bridge) ---
+@app.get("/api/projects/{project_id}/documents")
+async def local_list_documents(project_id: str):
+    from api.index import SUPABASE_URL, SUPABASE_ANON_KEY
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                res = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/project_documents?select=id,project_id,file_name,file_type,file_size,row_count,page_count,columns,sample_rows,created_at&project_id=eq.{project_id}&order=created_at.desc",
+                    headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
+                )
+                if res.status_code == 200:
+                    return {"documents": res.json()}
+        except Exception:
+            pass
+    return {"documents": LOCAL_PROJECT_DOCS.get(project_id, [])}
+
+
+@app.post("/api/projects/{project_id}/documents/upload")
+async def local_upload_document(project_id: str, file: UploadFile = File(...)):
+    from api.index import parse_project_file, SUPABASE_URL, SUPABASE_ANON_KEY
+    import uuid
+    raw_bytes = await file.read()
+    parsed = parse_project_file(file.filename or "uploaded_file", raw_bytes)
+    doc_id = str(uuid.uuid4())
+    record = {
+        "id": doc_id,
+        "project_id": project_id,
+        "file_name": parsed["file_name"],
+        "file_type": parsed["file_type"],
+        "file_size": parsed["file_size"],
+        "row_count": parsed["row_count"],
+        "page_count": parsed["page_count"],
+        "columns": parsed["columns"],
+        "sample_rows": parsed["sample_rows"],
+        "extracted_text": parsed["extracted_text"],
+        "file_data_base64": parsed["file_data_base64"],
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    if project_id not in LOCAL_PROJECT_DOCS:
+        LOCAL_PROJECT_DOCS[project_id] = []
+    LOCAL_PROJECT_DOCS[project_id].insert(0, record)
+
+    # Sync with Supabase if available
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                sb_rec = dict(record)
+                sb_rec["user_id"] = "00000000-0000-0000-0000-000000000000"
+                await client.post(
+                    f"{SUPABASE_URL}/rest/v1/project_documents",
+                    headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}", "Content-Type": "application/json"},
+                    json=sb_rec,
+                )
+        except Exception:
+            pass
+
+    return {"document": record}
+
+
+@app.delete("/api/projects/{project_id}/documents/{doc_id}")
+async def local_delete_document(project_id: str, doc_id: str):
+    if project_id in LOCAL_PROJECT_DOCS:
+        LOCAL_PROJECT_DOCS[project_id] = [d for d in LOCAL_PROJECT_DOCS[project_id] if d.get("id") != doc_id]
+    return {"deleted": doc_id}
+
+
+@app.get("/api/projects/{project_id}/documents/{doc_id}")
+async def local_get_document(project_id: str, doc_id: str):
+    docs = LOCAL_PROJECT_DOCS.get(project_id, [])
+    for d in docs:
+        if d.get("id") == doc_id:
+            return {"document": d}
+    raise HTTPException(status_code=404, detail="Document not found.")
 
 
 # --- Connectors & Agents Endpoints for Local Standalone Mode ---
@@ -173,7 +305,8 @@ class HybridRuntimeWorker:
                 "local_shell",
                 "credentials_vault",
                 "python_runtime",
-                "three_file_agent_context"
+                "three_file_agent_context",
+                "core_data_harness"
             ],
             "uptime_seconds": time.monotonic(),
             "timestamp": time.time()
