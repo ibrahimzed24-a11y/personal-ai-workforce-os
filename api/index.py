@@ -3,6 +3,7 @@ import sys
 import uuid
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -95,11 +96,48 @@ async def serve_js():
     raise HTTPException(status_code=404)
 
 # --- Request / Response Models ---
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(..., description="Project name")
+    description: Optional[str] = Field(default="", description="Project purpose / description")
+    category: Optional[str] = Field(default="general", description="Category tag")
+    lead_agent_id: Optional[str] = Field(default="coordinator", description="Assigned lead agent")
+
+PROJECTS_STORE: List[Dict[str, Any]] = [
+    {
+        "id": "proj-core-os",
+        "name": "Personal AI Workforce OS Evolution",
+        "description": "Sovereign 32-agent architecture, 5-stage loop engine, and hybrid Mac execution.",
+        "category": "core_infrastructure",
+        "lead_agent_id": "coordinator",
+        "status": "active",
+        "created_at": "2026-11-15T01:00:00"
+    },
+    {
+        "id": "proj-market-seo",
+        "name": "SEO & Global Market Expansion",
+        "description": "Competitive intelligence, keyword clustering, and GEO-targeted search optimization.",
+        "category": "market_research",
+        "lead_agent_id": "market-seo-geo-researcher",
+        "status": "active",
+        "created_at": "2026-11-15T02:00:00"
+    },
+    {
+        "id": "proj-web-automation",
+        "name": "Autonomous Browser & Telemetry Engine",
+        "description": "Headless Chromium navigation, DOM structured extraction, and visual verification.",
+        "category": "browser_automation",
+        "lead_agent_id": "browser-use-agent",
+        "status": "active",
+        "created_at": "2026-11-15T03:00:00"
+    }
+]
+
 class TaskSubmitRequest(BaseModel):
     title: str = Field(..., description="Task title")
     description: Optional[str] = Field(None, description="Detailed instructions")
     assigned_agent_id: Optional[str] = Field(default="coordinator", description="Target agent blueprint ID")
     target_agent: Optional[str] = Field(default=None, description="Alias for assigned_agent_id")
+    project_id: Optional[str] = Field(default="proj-core-os", description="Target project ID")
     runtime_target: str = Field(default="local", description="Target runtime ('local', 'cloud', 'any')")
     required_capabilities: Optional[List[str]] = Field(default_factory=list)
     priority: Any = Field(default=50, description="Priority (int or string)")
@@ -127,6 +165,27 @@ async def health_check():
         "database": "Supabase PostgreSQL (Cloud Hybrid Queue)",
         "agent_loop": "5-Stage Enforced (Run Policy -> Think -> Act -> Observe -> Deterministic Code Check)"
     }
+
+@app.get("/api/projects")
+async def list_projects():
+    """List all workspace projects."""
+    return PROJECTS_STORE
+
+@app.post("/api/projects", status_code=201)
+async def create_project(req: ProjectCreateRequest):
+    """Create a new project workspace."""
+    proj_id = f"proj-{uuid.uuid4().hex[:8]}"
+    new_proj = {
+        "id": proj_id,
+        "name": req.name,
+        "description": req.description or "",
+        "category": req.category or "general",
+        "lead_agent_id": req.lead_agent_id or "coordinator",
+        "status": "active",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    PROJECTS_STORE.insert(0, new_proj)
+    return new_proj
 
 @app.get("/api/nodes")
 async def list_runtime_nodes():
@@ -175,11 +234,14 @@ async def list_cloud_tasks():
                 raw_tasks = res.json()
                 normalized = []
                 for t in raw_tasks:
+                    payload = t.get("input_payload") or {}
+                    proj_id = payload.get("project_id") if isinstance(payload, dict) else "proj-core-os"
                     normalized.append({
                         "id": t.get("id"),
                         "title": t.get("title"),
                         "description": t.get("description"),
                         "assigned_agent_id": t.get("assigned_agent_id"),
+                        "project_id": proj_id or "proj-core-os",
                         "status": t.get("status", "pending"),
                         "priority": "high" if (isinstance(t.get("priority"), int) and t.get("priority") > 70) else ("low" if (isinstance(t.get("priority"), int) and t.get("priority") < 30) else "medium"),
                         "verification_status": t.get("verification_status", "pending"),
@@ -208,6 +270,8 @@ async def submit_cloud_task(req: TaskSubmitRequest):
         pri_val = pri_map.get(req.priority.lower(), 50)
 
     input_payload = req.input_payload or req.context or {}
+    if req.project_id:
+        input_payload["project_id"] = req.project_id
 
     res = await supabase.submit_hybrid_task(
         idempotency_key=idempotency_key,
@@ -223,15 +287,18 @@ async def submit_cloud_task(req: TaskSubmitRequest):
     if not res.get("success"):
         raise HTTPException(status_code=500, detail=res.get("error", "Task submission failed"))
     
+    task_obj = res.get("task") or {}
+    task_id = task_obj.get("id") or res.get("task_id")
+    
     return {
-        "id": res.get("task_id"),
+        "id": task_id,
         "title": req.title,
         "description": req.description,
         "assigned_agent_id": agent_id,
         "status": "pending",
         "priority": req.priority if isinstance(req.priority, str) else "medium",
         "verification_status": "pending",
-        "created_at": None
+        "created_at": task_obj.get("created_at")
     }
 
 @app.get("/api/tasks/{task_id}")

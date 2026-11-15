@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Workforce OS — Control Center</title>
+    <title>AI Workforce OS — Command Center</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,8 +20,8 @@
             </div>
         </div>
         <div class="mobile-actions">
-            <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()" title="Refresh tab data">⟳</button>
-            <button class="btn btn-primary btn-sm" onclick="window.openNewTaskModal()">+ Task</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.refreshActiveTab()" title="Refresh data">⟳</button>
+            <button class="btn btn-primary btn-sm" onclick="window.openNewProjectModal()">+ Project</button>
         </div>
     </header>
 
@@ -35,13 +35,19 @@
                 <div class="logo-mark">⚡</div>
                 <div class="brand-text">
                     <h1>AI Workforce OS</h1>
-                    <span class="badge online"><span class="beacon-pulse"></span> Cloud-Local Hybrid</span>
+                    <span class="badge online"><span class="beacon-pulse"></span> Hybrid Sovereign</span>
                 </div>
             </div>
             
             <nav class="nav-menu">
-                <button class="nav-item active" data-tab="tasks">
-                    <span class="icon">📋</span> Tasks & Queue
+                <button class="nav-item active" data-tab="home">
+                    <span class="icon">💬</span> Home & Console
+                </button>
+                <button class="nav-item" data-tab="projects">
+                    <span class="icon">📁</span> Projects
+                </button>
+                <button class="nav-item" data-tab="tasks">
+                    <span class="icon">📋</span> Task Queue
                 </button>
                 <button class="nav-item" data-tab="agents">
                     <span class="icon">🤖</span> 32 Agent Workforce
@@ -95,78 +101,132 @@
             <!-- Desktop Topbar -->
             <header class="topbar">
                 <div class="topbar-title-group">
-                    <div class="breadcrumb" id="currentTabTitle">Tasks & Queue</div>
-                    <span class="topbar-subtitle" id="currentTabSubtitle">Real-time autonomous multi-agent task execution and queue inspector</span>
+                    <div class="breadcrumb" id="currentTabTitle">Home & Command Console</div>
+                    <span class="topbar-subtitle" id="currentTabSubtitle">Voice & text autonomous prompting, active projects, and multi-agent execution</span>
                 </div>
                 <div class="actions">
                     <button class="btn btn-secondary" onclick="window.refreshActiveTab()">⟳ Refresh</button>
-                    <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewTaskModal()">+ Create Task</button>
+                    <button class="btn btn-primary" id="topbarActionBtn" onclick="window.openNewProjectModal()">+ Create Project</button>
                 </div>
             </header>
 
-            <!-- Executive KPI Metrics Bar -->
-            <section class="kpi-bar" id="kpiExecutiveBar">
-                <div class="kpi-card">
-                    <div class="kpi-icon">📋</div>
-                    <div class="kpi-content">
-                        <div class="kpi-label">Hybrid Tasks</div>
-                        <div class="kpi-value-row">
-                            <span class="kpi-value" id="kpiTotalTasks">0</span>
-                            <span class="kpi-meta" id="kpiCompletedTasks">0 Completed</span>
+            <!-- ==============================================================
+                 Tab 0: Home — Chat, Voice Prompting & Projects (First & Primary)
+                 ============================================================== -->
+            <section id="homeTab" class="tab-pane active">
+                <div class="home-container">
+                    <!-- Minimalist Header Banner -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+                        <div>
+                            <h1 style="font-size:22px; font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;">
+                                Autonomous Workforce Console
+                            </h1>
+                            <p style="font-size:13.5px; color:var(--text-muted); margin-top:2px;">
+                                Speak or type your goal. The Coordinator will decompose, assign, and verify execution.
+                            </p>
                         </div>
-                        <div class="kpi-progress">
-                            <div class="kpi-progress-bar" id="kpiTaskProgress" style="width: 0%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="kpi-card">
-                    <div class="kpi-icon" style="background:var(--bg-subtle); color:var(--text-primary);">🤖</div>
-                    <div class="kpi-content">
-                        <div class="kpi-label">Workforce OS</div>
-                        <div class="kpi-value-row">
-                            <span class="kpi-value">32</span>
-                            <span class="kpi-meta">Agents (8 Core + 24 Spec)</span>
-                        </div>
-                        <div class="kpi-progress">
-                            <div class="kpi-progress-bar" style="width: 100%; background: linear-gradient(135deg, #059669, #10b981);"></div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="badge online"><span class="beacon-pulse"></span> MacBook Pro Online</span>
+                            <span class="tag" style="background:var(--bg-blue-subtle); color:var(--accent);">32 Agents Ready</span>
                         </div>
                     </div>
-                </div>
 
-                <div class="kpi-card">
-                    <div class="kpi-icon" style="background:var(--success-bg); color:var(--success);">💻</div>
-                    <div class="kpi-content">
-                        <div class="kpi-label">Local Execution Node</div>
-                        <div class="kpi-value-row">
-                            <span class="kpi-value" style="font-size:15px; color:var(--success);" id="kpiNodeStatus">ONLINE</span>
-                            <span class="kpi-meta">MacBook Pro Primary</span>
+                    <!-- 1. The Autonomous Chat & Voice Prompting Console (First & Most Important) -->
+                    <div class="chat-command-box">
+                        <div class="chat-controls-bar">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">📁 Project:</span>
+                                <select id="chatProjectSelect" class="control-select" onchange="window.handleChatProjectChange(this.value)">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">🤖 Assign:</span>
+                                <select id="chatAgentSelect" class="control-select">
+                                    <option value="coordinator">Auto (Coordinator Decomposition)</option>
+                                    <option value="software-engineer">Software Engineer</option>
+                                    <option value="browser-use-agent">Browser Use Agent</option>
+                                    <option value="market-seo-geo-researcher">Market & SEO Analyst</option>
+                                    <option value="marketing-agent">Marketing Agent</option>
+                                    <option value="deployment-agent">Deployment Agent</option>
+                                    <option value="master-reporting-agent">Master Reporting Agent</option>
+                                    <option value="system-integrator-update-agent">System Integrator</option>
+                                </select>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size:12px; font-weight:600; color:var(--text-muted);">⚡ Priority:</span>
+                                <select id="chatPrioritySelect" class="control-select">
+                                    <option value="high">High</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="kpi-progress">
-                            <div class="kpi-progress-bar" style="width: 100%; background: var(--success);"></div>
+
+                        <textarea id="chatPromptInput" class="chat-textarea" placeholder="What would you like the workforce to build or execute? Speak or type instructions..." rows="3"></textarea>
+
+                        <div class="chat-actions-bar">
+                            <div class="voice-wrapper">
+                                <button type="button" class="btn-voice" id="voicePromptBtn" onclick="window.toggleVoicePrompt()" title="Click to speak your prompt (Microphone)">
+                                    <span id="voiceMicIcon" style="font-size:18px;">🎙️</span>
+                                    <span id="voiceBtnText">Voice Prompt</span>
+                                </button>
+                                <span class="voice-status-text" id="voiceStatusIndicator">
+                                    <span class="beacon-pulse" style="background:#ef4444;"></span> Listening... speak clearly
+                                </span>
+                            </div>
+
+                            <button type="button" class="btn-dispatch" id="dispatchGoalBtn" onclick="window.handleChatSubmit()">
+                                <span>Dispatch Goal</span>
+                                <span>→</span>
+                            </button>
                         </div>
                     </div>
-                </div>
 
-                <div class="kpi-card">
-                    <div class="kpi-icon" style="background:var(--indigo-bg); color:var(--indigo);">🧠</div>
-                    <div class="kpi-content">
-                        <div class="kpi-label">Inference Engine</div>
-                        <div class="kpi-value-row">
-                            <span class="kpi-value" style="font-size:14px; color:var(--indigo);" id="kpiModelStatus">Gemini 2.5 Flash</span>
-                            <span class="kpi-meta">Multi-Tier</span>
+                    <!-- 2. Live Command & Execution Stream -->
+                    <div class="chat-feed" id="homeChatStream">
+                        <!-- Loaded dynamically from recent tasks & chat interactions -->
+                    </div>
+
+                    <!-- 3. Projects Overview on Home Page -->
+                    <div class="projects-section" id="homeProjectsSection">
+                        <div class="projects-header">
+                            <div>
+                                <h2 style="font-size:17px; font-weight:700; color:var(--text-primary);">Active Projects</h2>
+                                <span class="subtext">Create projects and assign tasks for agents inside each project</span>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="window.openNewProjectModal()">+ New Project</button>
                         </div>
-                        <div class="kpi-progress">
-                            <div class="kpi-progress-bar" style="width: 100%; background: var(--indigo);"></div>
+
+                        <div class="projects-grid" id="homeProjectsGrid">
+                            <!-- Loaded dynamically -->
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- ==============================================================
-                 Tab 1: Tasks & Execution Queue
+                 Tab 1: Projects & Workspaces
                  ============================================================== -->
-            <section id="tasksTab" class="tab-pane active">
+            <section id="projectsTab" class="tab-pane">
+                <div class="panel full-panel" style="padding:20px;">
+                    <div class="panel-header" style="border:none; padding:0 0 16px 0;">
+                        <div>
+                            <h2>Projects & Workspaces</h2>
+                            <p class="subtext">Organize autonomous multi-agent workflows, goals, and deliverables by project.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="window.openNewProjectModal()">+ Create Project</button>
+                    </div>
+                    <div class="projects-grid" id="fullProjectsGrid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==============================================================
+                 Tab 2: Tasks & Execution Queue
+                 ============================================================== -->
+            <section id="tasksTab" class="tab-pane">
                 <div class="split-view">
                     <!-- Task List Panel -->
                     <div class="panel list-panel" id="taskListPanel">
@@ -202,7 +262,7 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 2: 32 Agent Workforce Blueprints
+                 Tab 3: 32 Agent Workforce Blueprints
                  ============================================================== -->
             <section id="agentsTab" class="tab-pane">
                 <div class="panel full-panel" style="padding:16px;">
@@ -238,7 +298,7 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 3: Interactive Workflow & DAG Visualizer (NEW)
+                 Tab 4: Interactive Workflow & DAG Visualizer
                  ============================================================== -->
             <section id="workflowsTab" class="tab-pane">
                 <div class="workflow-container">
@@ -267,7 +327,7 @@
                                 </div>
                                 <div class="dag-node-footer">
                                     <span>Input Protocol</span>
-                                    <code>JSON / Web UI</code>
+                                    <code>JSON / Web UI / Voice</code>
                                 </div>
                             </div>
                         </div>
@@ -432,7 +492,7 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 4: Sovereign Credentials Vault
+                 Tab 5: Sovereign Credentials Vault
                  ============================================================== -->
             <section id="securityTab" class="tab-pane">
                 <div class="panel full-panel" style="padding:16px; display:flex; flex-direction:column; gap:16px;">
@@ -497,7 +557,7 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 5: LLM & Models Inference Catalog
+                 Tab 6: LLM & Models Inference Catalog
                  ============================================================== -->
             <section id="modelsTab" class="tab-pane">
                 <div class="panel full-panel" style="padding:16px; display:flex; flex-direction:column; gap:20px;">
@@ -547,11 +607,10 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 6: System Integrator
+                 Tab 7: System Integrator
                  ============================================================== -->
             <section id="integratorTab" class="tab-pane">
                 <div class="split-view">
-                    <!-- Left: Incoming Assets Scanner -->
                     <div class="panel">
                         <div class="panel-header">
                             <div>
@@ -565,7 +624,6 @@
                         </div>
                     </div>
 
-                    <!-- Right: Installed Assets & Operational Knowledge -->
                     <div class="panel">
                         <div class="panel-header">
                             <h2>Operational Knowledge & Active Registry</h2>
@@ -586,7 +644,7 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 7: Requirements Engine
+                 Tab 8: Requirements Engine
                  ============================================================== -->
             <section id="requirementsTab" class="tab-pane">
                 <div class="split-view">
@@ -629,7 +687,7 @@
             </section>
 
             <!-- ==============================================================
-                 Tab 8: System Execution Event Log
+                 Tab 9: System Execution Event Log
                  ============================================================== -->
             <section id="eventsTab" class="tab-pane">
                 <div class="panel full-panel" style="padding:20px;">
@@ -649,39 +707,92 @@
 
     <!-- Mobile Bottom Navigation Bar -->
     <nav class="mobile-bottom-nav">
-        <button class="mobile-nav-item active" data-tab="tasks">
+        <button class="mobile-nav-item active" data-tab="home">
+            <span class="icon">💬</span>
+            <span>Home</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="projects">
+            <span class="icon">📁</span>
+            <span>Projects</span>
+        </button>
+        <button class="mobile-nav-item" data-tab="tasks">
             <span class="icon">📋</span>
             <span>Tasks</span>
-        </button>
-        <button class="mobile-nav-item" data-tab="agents">
-            <span class="icon">🤖</span>
-            <span>Agents</span>
         </button>
         <button class="mobile-nav-item" data-tab="workflows">
             <span class="icon">⚡</span>
             <span>Workflow</span>
         </button>
-        <button class="mobile-nav-item" data-tab="security">
-            <span class="icon">🔒</span>
-            <span>Vault</span>
-        </button>
-        <button class="mobile-nav-item" data-tab="models">
-            <span class="icon">🧠</span>
-            <span>Models</span>
+        <button class="mobile-nav-item" data-tab="agents">
+            <span class="icon">🤖</span>
+            <span>Agents</span>
         </button>
     </nav>
 
-    <!-- Create Task Modal -->
+    <!-- Create Project Modal -->
+    <div id="newProjectModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create New Project</h3>
+                <button class="close-btn" onclick="window.closeNewProjectModal()">✕</button>
+            </div>
+            <form onsubmit="window.handleCreateProject(event)">
+                <div class="form-group">
+                    <label>Project Name</label>
+                    <input type="text" id="projNameInput" class="input-field" placeholder="e.g. Automated E-Commerce Competitor Monitor" required>
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="projCategoryInput" class="input-field">
+                        <option value="engineering">Engineering & Architecture</option>
+                        <option value="market_research">Market & SEO Research</option>
+                        <option value="browser_automation">Browser Automation & Extraction</option>
+                        <option value="growth_marketing">Growth & Marketing</option>
+                        <option value="core_infrastructure">Core OS Infrastructure</option>
+                        <option value="general">General Operations</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Lead Agent</label>
+                    <select id="projLeadAgentInput" class="input-field">
+                        <option value="coordinator">Coordinator Agent (Operations & DAG Planning)</option>
+                        <option value="software-engineer">Software Engineer (Backend / Frontend)</option>
+                        <option value="browser-use-agent">Browser Use Agent (Web Navigation & Scraping)</option>
+                        <option value="market-seo-geo-researcher">Market, SEO & GEO Researcher</option>
+                        <option value="marketing-agent">Marketing Agent (Conversion & Copy)</option>
+                        <option value="deployment-agent">Deployment Agent (Release & Infrastructure)</option>
+                        <option value="master-reporting-agent">Master Reporting Agent (Audit Synthesis)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Project Description & Scope</label>
+                    <textarea id="projDescInput" class="input-field" rows="3" placeholder="Define the primary objective, deliverables, and operational scope..." required></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button type="button" class="btn btn-secondary" onclick="window.closeNewProjectModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Task / Assign Task Modal -->
     <div id="newTaskModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Create Autonomous Task</h3>
+                <h3 id="newTaskModalTitle">Assign Task to Project</h3>
                 <button class="close-btn" onclick="window.closeNewTaskModal()">✕</button>
             </div>
             <form onsubmit="window.handleCreateTask(event)">
                 <div class="form-group">
+                    <label>Target Project</label>
+                    <select id="taskProjectInput" class="input-field">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Task Title</label>
-                    <input type="text" id="taskTitleInput" class="input-field" placeholder="e.g. Conduct SEO audit and software architecture review" required>
+                    <input type="text" id="taskTitleInput" class="input-field" placeholder="e.g. Implement user authentication and session broker" required>
                 </div>
                 <div class="form-group">
                     <label>Assigned Core Agent</label>

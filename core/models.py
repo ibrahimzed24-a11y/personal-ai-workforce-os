@@ -37,10 +37,11 @@ class PlanStep(BaseModel):
 
 class TaskCreate(BaseModel):
     title: str
-    description: str
+    description: Optional[str] = ""
     priority: str = "medium"
     context: Dict[str, Any] = {}
     target_agent: Optional[str] = None
+    project_id: Optional[str] = None
 
 class TaskResponse(BaseModel):
     id: str

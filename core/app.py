@@ -48,6 +48,64 @@ app = FastAPI(
 )
 
 
+# --- Projects API ---
+class ProjectCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    category: Optional[str] = "general"
+    lead_agent_id: Optional[str] = "coordinator"
+
+PROJECTS_STORE: List[Dict[str, Any]] = [
+    {
+        "id": "proj-core-os",
+        "name": "Personal AI Workforce OS Evolution",
+        "description": "Sovereign 32-agent architecture, 5-stage loop engine, and hybrid Mac execution.",
+        "category": "core_infrastructure",
+        "lead_agent_id": "coordinator",
+        "status": "active",
+        "created_at": "2026-11-15T01:00:00"
+    },
+    {
+        "id": "proj-market-seo",
+        "name": "SEO & Global Market Expansion",
+        "description": "Competitive intelligence, keyword clustering, and GEO-targeted search optimization.",
+        "category": "market_research",
+        "lead_agent_id": "market-seo-geo-researcher",
+        "status": "active",
+        "created_at": "2026-11-15T02:00:00"
+    },
+    {
+        "id": "proj-web-automation",
+        "name": "Autonomous Browser & Telemetry Engine",
+        "description": "Headless Chromium navigation, DOM structured extraction, and visual verification.",
+        "category": "browser_automation",
+        "lead_agent_id": "browser-use-agent",
+        "status": "active",
+        "created_at": "2026-11-15T03:00:00"
+    }
+]
+
+@app.get("/api/projects")
+async def list_projects():
+    return PROJECTS_STORE
+
+@app.post("/api/projects", status_code=201)
+async def create_project(req: ProjectCreateRequest):
+    import uuid
+    from datetime import datetime
+    proj_id = f"proj-{uuid.uuid4().hex[:8]}"
+    new_proj = {
+        "id": proj_id,
+        "name": req.name,
+        "description": req.description or "",
+        "category": req.category or "general",
+        "lead_agent_id": req.lead_agent_id or "coordinator",
+        "status": "active",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    PROJECTS_STORE.insert(0, new_proj)
+    return new_proj
+
 # --- Tasks API ---
 @app.get("/api/tasks")
 async def list_tasks():
