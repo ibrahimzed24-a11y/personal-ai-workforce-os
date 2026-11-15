@@ -1303,6 +1303,10 @@ body {
     padding: 16px;
 }
 
+.modal-overlay.active {
+    display: flex !important;
+}
+
 .modal {
     background: #ffffff;
     border: 1px solid var(--border-color);
@@ -2202,12 +2206,14 @@ body {
     justify-content: center;
     padding-top: 12vh;
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.18s ease;
+    transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
 .palette-backdrop.active {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
 }
 

@@ -26,6 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMobileDrawer();
     setupChatShortcuts();
 
+    // Global Esc dismissal for all modal overlays
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+        }
+    });
+
     loadProjects();
     loadConnectors();
     loadTasks();
@@ -258,11 +265,9 @@ window.closeMobileSidebar = function() {
 };
 
 window.refreshActiveTab = function() {
-    if (activeTab === 'home') { loadProjects();
-    loadConnectors(); loadTasks(); }
+    if (activeTab === 'home') { loadProjects(); loadConnectors(); loadTasks(); }
     else if (activeTab === 'projects') loadProjects();
     else if (activeTab === 'connectors') loadConnectors();
-    loadConnectors();
     else if (activeTab === 'tasks') loadTasks();
     else if (activeTab === 'agents') loadAgents();
     else if (activeTab === 'security') { loadSecurityAccounts(); loadSecurityHealth(); loadSecurityAuditLogs(); }
