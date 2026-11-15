@@ -105,10 +105,11 @@ class HybridRuntimeWorker:
                 target_agent=target_agent
             )
             created = await self.orchestrator.create_task(local_task_in)
-            run_result = await self.orchestrator.run_task(created.id)
+            local_id = created.get("id") if isinstance(created, dict) else created.id
+            run_result = await self.orchestrator.run_task(local_id)
 
             output_result = {
-                "local_task_id": created.id,
+                "local_task_id": local_id,
                 "status": run_result.get("status", "SUCCESS"),
                 "result": run_result,
                 "node_id": self.node_id,
