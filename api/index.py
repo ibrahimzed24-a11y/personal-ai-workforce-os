@@ -253,14 +253,15 @@ async def get_authenticated_user(authorization: Optional[str] = Header(None)) ->
 
     # 2. Support service role key if used directly as token in test/admin mode
     if SUPABASE_SERVICE_ROLE_KEY and token == SUPABASE_SERVICE_ROLE_KEY:
-        return {"id": "00000000-0000-0000-0000-000000000000", "email": "operator@workforce-os.local", "_access_token": token}
+        return {"id": "3ff7069c-7720-43de-92ca-892170124f62", "email": "ibrahim.zed24@gmail.com", "_access_token": token}
 
     raise HTTPException(status_code=401, detail="Your session expired or token is invalid. Please sign in again.")
 
 
 def sb_headers(token: str) -> Dict[str, str]:
+    apikey = SUPABASE_SERVICE_ROLE_KEY if (SUPABASE_SERVICE_ROLE_KEY and token == SUPABASE_SERVICE_ROLE_KEY) else SUPABASE_ANON_KEY
     return {
-        "apikey": SUPABASE_ANON_KEY,
+        "apikey": apikey,
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "Prefer": "return=representation",
