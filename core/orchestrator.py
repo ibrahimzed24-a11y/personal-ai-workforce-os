@@ -123,7 +123,7 @@ class Orchestrator:
             """, (
                 task_id,
                 task_in.title,
-                task_in.description,
+                task_in.description or "",
                 task_in.target_agent or "coordinator",
                 task_in.priority,
                 json.dumps(task_in.context),

@@ -99,7 +99,7 @@ class HybridRuntimeWorker:
             # 2. Dispatch to Local Orchestrator
             local_task_in = TaskCreate(
                 title=f"[Cloud] {title}",
-                description=task.get("description", ""),
+                description=task.get("description") or "",
                 priority="HIGH",
                 context=input_payload,
                 target_agent=target_agent
