@@ -204,6 +204,8 @@ class AgentContextLoader:
             f"{agent_memory}\n\n"
             f"=== SPECIALIZED SKILL WORKFLOW ({skill_data['slash_command']}) ===\n"
             f"{skill_data['procedure_markdown']}\n\n"
+            f"=== GRILLME ALIGNMENT PROTOCOL (/grillme) ===\n"
+            f"Always clarify critical operational variables and steer the admin toward the optimal workflow, logic, and accessibility before irreversible execution.\n\n"
             f"=== MANDATORY STARTUP SEQUENCE ENFORCED ===\n"
             f"1. Read AGENT.md (Done)\n"
             f"2. Read MEMORY.md before every job (Done)\n"

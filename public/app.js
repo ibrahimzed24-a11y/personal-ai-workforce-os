@@ -742,6 +742,38 @@ window.insertChatCommand = function (cmd) {
   input.focus();
 };
 
+window.proceedWithGrillMe = function (recDirective) {
+  if (!activeProjectId) return showToast('Select a project first.');
+  const input = document.getElementById('chat-input');
+  if (input) {
+    input.value = `Proceed with recommended workflow: ${recDirective} --proceed`;
+  }
+  const form = document.getElementById('chat-form');
+  if (form) {
+    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+  }
+};
+
+window.customizeGrillMe = function (recDirective) {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  input.value = recDirective;
+  input.focus();
+};
+
+window.selectGrillMeOption = function (questionId, optionText) {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const currentVal = input.value.trim();
+  if (!currentVal || currentVal.startsWith('/grillme')) {
+    input.value = `Regarding ${questionId}: ${optionText}`;
+  } else {
+    input.value += ` | ${optionText}`;
+  }
+  input.focus();
+  showToast(`Option added: "${optionText.slice(0, 40)}..."`, 'info');
+};
+
 window.downloadProjectReport = async function (url) {
   if (!url) return showToast('Report file not found.', 'error');
   try {
@@ -935,6 +967,83 @@ function renderChat(messages) {
         }
       }
 
+      // GrillMe Interactive Alignment Card
+      let grillmeHtml = '';
+      let gData = m.grillme || m.command_args?.grillme;
+      if (!gData && typeof m.command_args === 'string') {
+        try {
+          const parsed = JSON.parse(m.command_args);
+          gData = parsed?.grillme;
+        } catch {}
+      }
+
+      if (gData && Array.isArray(gData.questions) && gData.questions.length > 0) {
+        const wf = gData.proposed_workflow || {};
+        const stages = wf.stages || [];
+        const questions = gData.questions || [];
+        const recDirective = gData.recommended_directive || '';
+
+        grillmeHtml = `
+        <div class="grillme-card">
+          <div class="grillme-header">
+            <div class="grillme-header-title">
+              <span>🎯</span>
+              <span>GrillMe Alignment: Optimal Workflow & Logic</span>
+            </div>
+            <span class="grillme-badge">${escapeHtml(gData.department || 'Operations')} • ${escapeHtml(gData.agent_name || 'Coordinator')}</span>
+          </div>
+
+          <div class="grillme-workflow-box">
+            <div class="grillme-workflow-title">⚡ ${escapeHtml(wf.title || 'Optimal Execution Pipeline')}</div>
+            <div class="grillme-workflow-logic">${escapeHtml(wf.logic || 'Deterministic multi-stage execution with automated verifications.')}</div>
+            <div class="grillme-stepper">
+              ${stages.map(s => `
+                <div class="grillme-step">
+                  <div><span class="grillme-step-num">Step ${s.step}:</span> <span class="grillme-step-agent">@${escapeHtml(s.agent)}</span></div>
+                  <div style="color:var(--text); margin-top:0.2rem;">${escapeHtml(s.action)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="grillme-questions-list">
+            <div style="font-size:0.76rem; font-weight:700; color:var(--text); margin-bottom:0.2rem;">
+              📋 Tailored Operational Clarification Sequence:
+            </div>
+            ${questions.map((q, idx) => `
+              <div class="grillme-question-card">
+                <div class="grillme-q-text">Q${idx + 1}: ${escapeHtml(q.question)}</div>
+                <div class="grillme-q-why">💡 <em>Why this matters:</em> ${escapeHtml(q.why_this_matters || '')}</div>
+                <div class="grillme-options-grid">
+                  ${(q.options || []).map(opt => {
+                    const isRec = opt.includes('(Recommended)');
+                    const cleanOpt = opt.replace(/\s*\(Recommended\)\s*/g, '').trim();
+                    const escapedClean = escapeHtml(cleanOpt).replace(/'/g, "\\'");
+                    return `
+                      <button type="button" 
+                        class="grillme-option-pill ${isRec ? 'recommended' : ''}" 
+                        onclick="selectGrillMeOption('${q.id}', '${escapedClean}')"
+                        title="Click to select this option for chat">
+                        ${isRec ? '✓ ' : '• '} ${escapeHtml(opt)}
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="grillme-actions">
+            <button type="button" class="btn-grillme-proceed" onclick="proceedWithGrillMe('${escapeHtml(recDirective).replace(/'/g, "\\'")}')">
+              ⚡ Proceed with Recommended Workflow
+            </button>
+            <button type="button" class="btn-grillme-customize" onclick="customizeGrillMe('${escapeHtml(recDirective).replace(/'/g, "\\'")}')">
+              ✏️ Customize in Chat
+            </button>
+          </div>
+        </div>`;
+      }
+
       return `
       <div class="msg-bubble ${roleClass}" dir="auto">
         <div class="msg-meta">
@@ -944,6 +1053,7 @@ function renderChat(messages) {
           ${telemetry}
         </div>
         <div style="line-height:1.55;">${escapeHtml(m.content).replace(/\\n/g, '<br/>')}</div>
+        ${grillmeHtml}
         ${artifactsHtml}
       </div>`;
     })

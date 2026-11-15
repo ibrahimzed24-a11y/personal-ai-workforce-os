@@ -516,6 +516,11 @@ class ChatDispatchRequest(BaseModel):
     local_worker_output: Optional[str] = None
 
 
+class GrillMeRequest(BaseModel):
+    directive: Optional[str] = None
+    agent_id: Optional[str] = None
+
+
 # --- Auth Dependency ---
 async def get_authenticated_user(
     authorization: Optional[str] = Header(None),
@@ -1142,35 +1147,70 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
             },
         )
 
-        # 4. Check for Direct 1-on-1 Agent Chat (@agent-name <prompt>)
+        # 4. Check for proceed / execution confirmation or answers to questions:
+        lower_msg = msg_raw.lower()
+        is_proceed = any(k in lower_msg for k in [
+            "--proceed", "--autonomous", "proceed", "go ahead", "execute now", "run pipeline", "⚡ proceed"
+        ])
+
         direct_match = re.match(r"^@([a-zA-Z0-9_\-]+)\s+(.*)$", msg_raw, re.DOTALL)
-        if direct_match:
-            target_agent = direct_match.group(1).lower()
-            sub_directive = direct_match.group(2).strip()
-            pipeline_res = await orchestrator.execute_sequential_pipeline(
+        target_agent = direct_match.group(1).lower() if direct_match else None
+        directive_text = direct_match.group(2).strip() if direct_match else msg_raw
+
+        # If not explicit proceed/autonomous execution, trigger the GrillMe alignment interview
+        # to question the admin tailored to the agent's role and steer toward the best workflow & logic!
+        if not is_proceed:
+            from core.grillme import GrillMeEngine
+            engine = GrillMeEngine()
+            interview = engine.generate_alignment_interview(
+                directive=directive_text,
+                agent_id=target_agent,
                 project=project,
-                directive=sub_directive,
-                agents=[target_agent],
-                user=user,
-                token=token,
                 documents=documents,
                 tools=tools
             )
+
+            # Persist the alignment interview in Supabase project_messages
+            await client.post(
+                f"{SUPABASE_URL}/rest/v1/project_messages",
+                headers=sb_headers(token),
+                json={
+                    "user_id": user["id"],
+                    "project_id": payload.project_id,
+                    "sender_role": "agent",
+                    "sender_name": interview["agent_name"],
+                    "recipient_agent": interview["agent_id"],
+                    "command": "/grillme",
+                    "command_args": {"grillme": interview},
+                    "content": interview["formatted_markdown"],
+                },
+            )
+
             return {
                 "reply": {
                     "sender_role": "agent",
-                    "sender_name": target_agent,
-                    "content": pipeline_res["final_report"],
-                    "artifacts": pipeline_res.get("exported_artifacts", [])
+                    "sender_name": interview["agent_name"],
+                    "content": interview["formatted_markdown"],
+                    "grillme": interview,
+                    "artifacts": []
                 },
-                "run": pipeline_res
+                "run": None
             }
 
-        # 5. Full Sequential Multi-Agent Pipeline Execution & Terminal Synthesis
-        agents = project.get("assigned_agents") or ["coordinator", "browser-researcher", "report-compiler"]
+        # Otherwise, the admin confirmed execution: strip proceed triggers and dispatch pipeline
+        clean_directive = re.sub(
+            r"--proceed|--autonomous|proceed with recommended workflow:\s*|proceed\s*|execute\s*",
+            "",
+            directive_text,
+            flags=re.IGNORECASE
+        ).strip()
+        if not clean_directive:
+            clean_directive = directive_text or project.get("goal") or "Execute project milestone with optimal workflow"
+
+        agents = [target_agent] if target_agent else (project.get("assigned_agents") or ["coordinator", "browser-researcher", "report-compiler"])
         pipeline_res = await orchestrator.execute_sequential_pipeline(
             project=project,
-            directive=msg_raw,
+            directive=clean_directive,
             agents=agents,
             user=user,
             token=token,
@@ -1180,13 +1220,54 @@ async def project_chat_and_pipeline(payload: ChatDispatchRequest, user: Dict[str
 
         return {
             "reply": {
-                "sender_role": "coordinator",
-                "sender_name": f"Master Reporting Agent ({project.get('llm_model', 'Default')})",
+                "sender_role": "coordinator" if not target_agent else "agent",
+                "sender_name": f"{target_agent}" if target_agent else f"Master Reporting Agent ({project.get('llm_model', 'Default')})",
                 "content": pipeline_res["final_report"],
                 "artifacts": pipeline_res.get("exported_artifacts", [])
             },
             "run": pipeline_res
         }
+
+
+@app.post("/api/projects/{project_id}/grillme")
+async def trigger_grillme_endpoint(
+    project_id: str,
+    payload: GrillMeRequest,
+    user: Dict[str, Any] = Depends(get_authenticated_user)
+):
+    token = user["_access_token"]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        proj_res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/projects?id=eq.{project_id}",
+            headers=sb_headers(token),
+        )
+        if proj_res.status_code != 200 or not proj_res.json():
+            raise HTTPException(status_code=404, detail="Project not found.")
+        project = proj_res.json()[0]
+
+        vault_res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/credential_vault?select=tool_name,login_url,username_identifier,encrypted_secret,allowed_actions&project_id=eq.{project_id}&is_enabled=eq.true",
+            headers=sb_headers(token),
+        )
+        tools = vault_res.json() if vault_res.status_code == 200 else []
+
+        doc_res = await client.get(
+            f"{SUPABASE_URL}/rest/v1/project_documents?select=file_name,file_type,file_size,row_count,page_count,columns,extracted_text&project_id=eq.{project_id}&order=created_at.asc",
+            headers=sb_headers(token),
+        )
+        documents = doc_res.json() if doc_res.status_code == 200 else []
+
+    directive = payload.directive or project.get("goal") or "Execute project milestone"
+    from core.grillme import GrillMeEngine
+    engine = GrillMeEngine()
+    interview = engine.generate_alignment_interview(
+        directive=directive,
+        agent_id=payload.agent_id,
+        project=project,
+        documents=documents,
+        tools=tools
+    )
+    return {"status": "ok", "interview": interview}
 
 
 # --- Project Reports & Handovers Inspection Endpoints ---

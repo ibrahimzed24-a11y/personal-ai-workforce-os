@@ -309,3 +309,85 @@ def test_download_auth_query_parameter_and_squad_selection():
     assert "master-reporting-agent" in agent_ids
 
 
+def test_grillme_skill_and_engine_alignment():
+    from core.grillme import GrillMeEngine
+    engine = GrillMeEngine()
+
+    dummy_docs = [{"file_name": "Canadian Dental Clinics Leads.csv", "row_count": 50}]
+    dummy_tools = [{"tool_name": "Hostinger SMTP", "login_url": "smtp.hostinger.com:465"}]
+    dummy_project = {
+        "id": "ec48c7ae-185b-4ec9-bf2c-183024b740f4",
+        "name": "valioz health sales",
+        "slug": "valioz-health-sales"
+    }
+
+    # 1. Sales & Outreach Vector
+    interview = engine.generate_alignment_interview(
+        directive="Review records and start drafting emails for Canadian dental clinics",
+        agent_id=None,
+        project=dummy_project,
+        documents=dummy_docs,
+        tools=dummy_tools
+    )
+    assert interview["status"] == "ready"
+    assert interview["agent_id"] == "coordinator"
+    assert "Sales Squad" in interview["agent_name"]
+    assert len(interview["proposed_workflow"]["stages"]) == 4
+    assert len(interview["questions"]) >= 3
+    assert any("Toronto" in q["recommended_option"] for q in interview["questions"])
+    assert "⚡ Proceed with Recommended Workflow" in interview["formatted_markdown"]
+
+    # 2. Software Engineering Vector
+    code_interview = engine.generate_alignment_interview(
+        directive="Refactor database schema and add pytest coverage",
+        agent_id="software-engineer",
+        project=dummy_project,
+        documents=[],
+        tools=[]
+    )
+    assert code_interview["agent_id"] == "software-engineer"
+    assert "Engineering" in code_interview["department"]
+    assert any("Modular Resilient Micro-Service" in q["recommended_option"] for q in code_interview["questions"])
+
+
+def test_grillme_slash_command_and_permanent_skill():
+    import asyncio
+    from core.agent_context import AgentContextLoader
+    from core.orchestrator import PipelineHandoverOrchestrator
+    from api.index import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+    # 1. Permanent skill discovery
+    loader = AgentContextLoader()
+    skills = loader.discover_permanent_skills()
+    grillme_skill = next((s for s in skills if s["slash_command"] == "/grillme"), None)
+    assert grillme_skill is not None
+    assert grillme_skill["name"] == "grillme-adaptive-clarification"
+    assert len(grillme_skill["department_affinity"]) == 8
+
+    # 2. Slash command routing
+    orchestrator = PipelineHandoverOrchestrator(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    dummy_project = {
+        "id": "ec48c7ae-185b-4ec9-bf2c-183024b740f4",
+        "name": "valioz health sales",
+        "slug": "valioz-health-sales"
+    }
+    dummy_user = {"id": "3ff7069c-7720-43de-92ca-892170124f62", "email": "ibrahim.zed24@gmail.com"}
+
+    async def _run():
+        res = await orchestrator.handle_slash_command(
+            raw_message="/grillme @browser-use-agent Extract Canadian clinic records",
+            project=dummy_project,
+            user=dummy_user,
+            token=SUPABASE_SERVICE_ROLE_KEY,
+            documents=[],
+            tools=[]
+        )
+        assert res is not None
+        assert res["role"] == "agent"
+        assert res["grillme"]["is_grillme"] is True
+        assert len(res["grillme"]["questions"]) >= 2
+
+    asyncio.run(_run())
+
+
+

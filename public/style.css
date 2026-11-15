@@ -655,3 +655,190 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .dag-stepper { flex-direction: column; }
   .dag-edge { transform: rotate(90deg); margin: 0.5rem 0; }
 }
+
+
+/* --- GrillMe Interactive Alignment Card & Pills --- */
+.cmd-pill.grillme-pill {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.35);
+  font-weight: 700;
+}
+.cmd-pill.grillme-pill:hover {
+  background: #059669;
+  color: #ffffff;
+}
+
+.grillme-card {
+  margin-top: 0.75rem;
+  background: var(--surface);
+  border: 1.5px solid #10B981;
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.08);
+}
+.grillme-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+.grillme-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.grillme-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-radius: 20px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.grillme-workflow-box {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.grillme-workflow-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+.grillme-workflow-logic {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+  font-style: italic;
+}
+.grillme-stepper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+.grillme-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.72rem;
+}
+.grillme-step-num {
+  font-weight: 700;
+  color: #059669;
+  margin-right: 0.25rem;
+}
+.grillme-step-agent {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.grillme-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.grillme-question-card {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+}
+.grillme-q-text {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+.grillme-q-why {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.grillme-options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.grillme-option-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.72rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-align: left;
+}
+.grillme-option-pill:hover {
+  border-color: #059669;
+  background: rgba(16, 185, 129, 0.05);
+}
+.grillme-option-pill.recommended {
+  border-color: #10B981;
+  background: rgba(16, 185, 129, 0.1);
+  color: #065F46;
+  font-weight: 600;
+}
+.grillme-option-pill.recommended:hover {
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.grillme-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+.btn-grillme-proceed {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 1rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+  transition: all 0.15s ease;
+}
+.btn-grillme-proceed:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+.btn-grillme-customize {
+  background: var(--surface-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-grillme-customize:hover {
+  background: #E2E8F0;
+}

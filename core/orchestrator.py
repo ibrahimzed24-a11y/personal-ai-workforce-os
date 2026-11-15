@@ -139,6 +139,10 @@ class PipelineHandoverOrchestrator:
         elif cmd == "/assign":
             return await self._execute_assign(msg, project, user, token, documents, tools)
 
+        # /grillme [agent_id] [directive]
+        elif cmd in ("/grillme", "/grill"):
+            return await self._execute_grillme(msg, project, user, token, documents, tools)
+
         return None
 
     # --- 2. Implementation of /ask ---
@@ -414,7 +418,78 @@ Capabilities:
             tools=tools
         )
 
-    # --- 6. Full Sequential 5-Stage Pipeline Handover Execution ---
+    # --- 6. Implementation of /grillme Adaptive Alignment Interview ---
+    async def _execute_grillme(
+        self,
+        raw_cmd: str,
+        project: Dict[str, Any],
+        user: Dict[str, Any],
+        token: str,
+        documents: List[Dict[str, Any]],
+        tools: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        started = time.perf_counter()
+        parts = raw_cmd.split(maxsplit=2)
+        target_agent = None
+        directive = ""
+
+        if len(parts) == 1:
+            directive = project.get("goal") or project.get("name") or "Execute project milestone with optimal workflow"
+        elif len(parts) == 2:
+            if parts[1].startswith("@"):
+                target_agent = parts[1].lstrip("@")
+                directive = project.get("goal") or project.get("name") or "Execute project milestone with optimal workflow"
+            else:
+                directive = parts[1]
+        else:
+            if parts[1].startswith("@"):
+                target_agent = parts[1].lstrip("@")
+                directive = parts[2]
+            else:
+                directive = f"{parts[1]} {parts[2]}"
+
+        from core.grillme import GrillMeEngine
+        engine = GrillMeEngine()
+        interview = engine.generate_alignment_interview(
+            directive=directive,
+            agent_id=target_agent,
+            project=project,
+            documents=documents,
+            tools=tools
+        )
+
+        latency_ms = int((time.perf_counter() - started) * 1000)
+
+        # Record in Supabase
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            await client.post(
+                f"{self.supabase_url}/rest/v1/project_messages",
+                headers=self._headers(token),
+                json={
+                    "user_id": user["id"],
+                    "project_id": project["id"],
+                    "sender_role": "agent",
+                    "sender_name": interview["agent_name"],
+                    "recipient_agent": interview["agent_id"],
+                    "command": "/grillme",
+                    "command_args": {"grillme": interview},
+                    "content": interview["formatted_markdown"],
+                    "latency_ms": latency_ms,
+                    "token_count": len(interview["formatted_markdown"].split())
+                }
+            )
+
+        return {
+            "role": "agent",
+            "name": interview["agent_name"],
+            "sender_role": "agent",
+            "sender_name": interview["agent_name"],
+            "content": interview["formatted_markdown"],
+            "grillme": interview,
+            "latency_ms": latency_ms
+        }
+
+    # --- 7. Full Sequential 5-Stage Pipeline Handover Execution ---
     async def execute_sequential_pipeline(
         self,
         project: Dict[str, Any],
