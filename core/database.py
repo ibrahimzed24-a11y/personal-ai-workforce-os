@@ -273,6 +273,69 @@ CREATE TABLE IF NOT EXISTS verification_audits (
     FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE SET NULL
 );
 
+-- LLM Provider & Model Management
+CREATE TABLE IF NOT EXISTS llm_providers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    provider_type TEXT NOT NULL, -- local_ollama, cloud_openai, cloud_gemini, cloud_anthropic, openai_compatible, mock
+    base_url TEXT NOT NULL,
+    api_key_ref TEXT,            -- Vault account ID reference if secured
+    is_active INTEGER NOT NULL DEFAULT 1,
+    health_status TEXT NOT NULL DEFAULT 'unknown', -- healthy, unreachable, unauthenticated, error, unknown
+    last_health_check TIMESTAMP,
+    config_json TEXT DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS llm_models (
+    id TEXT PRIMARY KEY,
+    provider_id TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    classification TEXT NOT NULL, -- local, cloud, mock
+    context_window INTEGER DEFAULT 8192,
+    supports_tools INTEGER NOT NULL DEFAULT 1,
+    supports_structured_output INTEGER NOT NULL DEFAULT 1,
+    supports_vision INTEGER NOT NULL DEFAULT 0,
+    capabilities TEXT NOT NULL DEFAULT '[]', -- JSON array of tags: coding, reasoning, fast, general
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    latency_p50_ms REAL DEFAULT 0.0,
+    success_rate REAL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(provider_id) REFERENCES llm_providers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS llm_routing_rules (
+    id TEXT PRIMARY KEY,
+    rule_name TEXT NOT NULL,
+    task_category TEXT NOT NULL DEFAULT '*', -- code, research, marketing, coordination, general, sensitive
+    agent_id_match TEXT NOT NULL DEFAULT '*',
+    privacy_level TEXT NOT NULL DEFAULT 'standard', -- local_only, standard, cloud_allowed
+    preferred_model_id TEXT NOT NULL,
+    fallback_model_id TEXT,
+    allow_cloud_fallback INTEGER NOT NULL DEFAULT 0,
+    priority INTEGER NOT NULL DEFAULT 10,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(preferred_model_id) REFERENCES llm_models(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS llm_usage_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id TEXT,
+    step_id TEXT,
+    agent_id TEXT,
+    model_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    latency_ms REAL DEFAULT 0.0,
+    success INTEGER NOT NULL DEFAULT 1,
+    error_message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_events_task_id ON execution_events(task_id);
@@ -285,6 +348,11 @@ CREATE INDEX IF NOT EXISTS idx_credential_audit_actor ON credential_audit_logs(a
 CREATE INDEX IF NOT EXISTS idx_verification_audits_status ON verification_audits(status);
 CREATE INDEX IF NOT EXISTS idx_verification_audits_target ON verification_audits(target_component);
 CREATE INDEX IF NOT EXISTS idx_verification_audits_profile ON verification_audits(profile);
+CREATE INDEX IF NOT EXISTS idx_llm_models_provider ON llm_models(provider_id);
+CREATE INDEX IF NOT EXISTS idx_llm_models_active ON llm_models(is_active);
+CREATE INDEX IF NOT EXISTS idx_llm_routing_task ON llm_routing_rules(task_category);
+CREATE INDEX IF NOT EXISTS idx_llm_metrics_task ON llm_usage_metrics(task_id);
+CREATE INDEX IF NOT EXISTS idx_llm_metrics_model ON llm_usage_metrics(model_id);
 """
 
 from contextlib import asynccontextmanager

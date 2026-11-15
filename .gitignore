@@ -1,10 +1,60 @@
+# Secrets, Environment & Cryptographic Keys
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.cert
+*.p12
+*.pfx
+.ai_workforce_vault.key
+
+# Python Virtual Environments & Packages
 .venv/
-temp/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Python Bytecode & Caches
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Database & Operational Runtime State
 data/*.db-wal
 data/*.db-shm
 data/*.pid
+
+# Runtime Logs, PIDs & Screenshots
+logs/*.log
+logs/*.pid
 logs/screenshots/
+
+# Temporary & Ephemeral Scratchpads
+temp/
+tmp/
+*.tmp
+
+# Backups & Archives
+backups/*.zip
+backups/*.tar.gz
+backups/*.bak
+
+# OS-Specific Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+backups/

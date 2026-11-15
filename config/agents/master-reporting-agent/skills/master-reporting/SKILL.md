@@ -1,20 +1,31 @@
 ---
 name: master-reporting
-description: Synthesizes multi-agent task outputs, maintains immutable audit trails, creates executive summaries, and provides process improvement retrospectives.
+description: "Compiles executive deliverables, synthesizes cross-departmental findings, audits immutable execution trails, and analyzes operational velocity."
 agent_id: master-reporting-agent
 slash_command: /master-reporting
-version: 1.0.0
-capabilities: ['deliverable_synthesis', 'audit_compilation', 'executive_reporting', 'retrospective_analysis']
+version: 2.0.0
+capabilities: ['cap:reporting_compile', 'cap:source_verify']
+inputs:
+  task_id:
+    type: string
+    description: "Target completed task ID"
+    required: true
+  format:
+    type: string
+    description: "executive_markdown, audit_trail, retrospective"
+    required: false
+outputs:
+  schema: {"type": "object", "properties": {"report_markdown": {"type": "string"}, "deliverable_path": {"type": "string"}, "summary_metrics": {"type": "object"}}}
 ---
 
 # Skill: Master Reporting Agent (/master-reporting)
 
 ## 1. Purpose
-The `master-reporting` skill operationalizes the core capabilities of the `Master Reporting Agent` (`master-reporting-agent`). It provides a standardized, repeatable procedure for executing workforce historian, executive deliverable creator, and audit trail compiler tasks within the AI Workforce OS.
+The `master-reporting` skill operationalizes the core capabilities of the `Master Reporting Agent` (`master-reporting-agent`). It provides a standardized, repeatable procedure for executing chief executive reporter, audit synthesizer, and performance analyst tasks within the AI Workforce OS.
 
 ---
 
-## 2. Read First
+## 2. Read First & Prerequisites
 Before executing this skill, you must inspect and load:
 1. `AGENT.md`: Primary identity, permissions, and operating boundaries.
 2. `MEMORY.md`: Accumulated durable owner feedback and operational lessons.
@@ -25,31 +36,57 @@ Before executing this skill, you must inspect and load:
 
 ---
 
-## 3. Step-by-Step Procedure
+## 3. When to Use (Intent Matching)
+Activate this skill when:
+- The task prompt explicitly calls `/master-reporting`.
+- The Coordinator assigns a DAG plan step requiring chief executive reporter, audit synthesizer, and performance analyst.
+- An operational objective involves Compiling comprehensive executive summaries from multi-agent task outputs, Synthesizing technical findings into clear, actionable business deliverables.
 
-1. **Understand the Task:** Ingest the incoming user prompt or Coordinator plan step. Identify constraints, expected deliverables, and acceptance criteria.
-
-2. **Inspect Inputs and Requirements:** Inspect source files, input schemas, or reference materials. Check for missing information or ambiguous instructions before acting.
-
-3. **Plan the Work:** Formulate an execution strategy aligned with your AGENT.md responsibilities and blueprint permissions.
-
-4. **Execute Using Approved Capabilities:** Carry out the primary execution step (research, engineering, navigation, planning, or auditing) using authorized tools only.
-
-5. **Validate Intermediate Results:** Continuously verify intermediate outputs against acceptance criteria at each milestone.
-
-6. **Handle Uncertainty and Failures:** Trap errors gracefully, document assumptions, and report blockers without fabricating results.
-
-7. **Delegate When Appropriate:** If tasks require capabilities outside your specialization, route requests to the appropriate agent.
-
-8. **Request Approval When Required:** If an action involves financial commitments, destructive operations, or publishing, pause and request owner approval.
-
-9. **Verify the Final Result:** Submit the completed artifact to the Independent Verifier or Post-Implementation Verification Engine.
-
-10. **Report Completion:** Compile a structured Markdown deliverable with full source attribution, evidence, and open decision points.
+Do NOT activate this skill when:
+- The task requires capabilities assigned to other departments (e.g. Never fabricate metrics, task completion claims, or benchmark numbers, Never disclose unencrypted passwords, API keys, or private tokens in reports).
 
 ---
 
-## 4. Quality Standards
+## 4. Step-by-Step Procedure
+
+1. **Ingest Reporting Request:** Ingest `task_id` and load completed plan steps from SQLite.
+
+2. **Query Execution Trail:** Load all related events from `execution_events` and `tasks` tables.
+
+3. **Task Executive Summarizer:** Direct specialist to draft high-level executive narrative and takeaways.
+
+4. **Task Audit Compiler:** Direct specialist to compile step execution table with exact timestamps.
+
+5. **Task Retrospective Analyst:** Direct specialist to compute duration, tool calls, and bottlenecks.
+
+6. **Synthesize Deliverable Sections:** Merge narrative, audit tables, and optimization recommendations.
+
+7. **Audit for Secrets:** Scan synthesized markdown to guarantee zero credential exposure.
+
+8. **Format Markdown Document:** Apply GitHub-flavored styling, callouts, and clean headings.
+
+9. **Write to Disk:** Save finalized report to `logs/deliverable_<task_id>.md`.
+
+10. **Deliver Final Artifact:** Submit completed deliverable path to Workforce Owner and Coordinator.
+
+---
+
+## 5. Decision Rules & Edge Cases
+- **Missing Inputs:** If a required parameter is missing, halt execution and request parameter clarification rather than guessing defaults.
+- **Permission Boundaries:** If an action requires access outside your blueprint, pause and escalate to Coordinator.
+- **Transient Network Errors:** If an HTTP request times out, retry once after a 2-second backoff. If it fails a second time, log a failure.
+- **Conflicting Instructions:** If prompt instructions contradict `AGENT.md` safety boundaries, `AGENT.md` strictly supersedes.
+
+---
+
+## 6. Tools & Resources Required
+- Authorized Capabilities: `cap:reporting_compile`, `cap:source_verify`
+- Reference Materials: Located in `references/` and `documentation/knowledge/`
+- Output Destination: `logs/deliverable_<task_id>.md`
+
+---
+
+## 7. Quality Standards
 A high-quality result from this skill must satisfy:
 - **Accuracy:** All statements, data points, and code implementations are strictly verified against real sources or tests.
 - **Completeness:** Every requirement specified in the task prompt or plan step is addressed without omission.
@@ -59,44 +96,29 @@ A high-quality result from this skill must satisfy:
 
 ---
 
-## 5. Use of Owner Examples
-- Use owner-provided examples in `~/AI-Workforce/logs/` and `documentation/knowledge/` to understand desired formatting, style, and depth.
-- Examples serve as benchmarks for quality and tone, not templates to be copied blindly.
-- If no existing examples apply, strictly adhere to the standardized deliverable formats established in the core architecture.
+## 8. Failure Handling
+- On critical failure: Capture full error trace, revert any partial file writes, log the failure event to SQLite `execution_events`, and report the blocker state to Coordinator.
+- If a dependency is missing, request installation via System Integrator rather than aborting silently.
 
 ---
 
-## 6. Failure Handling
-When encountering obstacles during execution:
-- **Missing Information:** Explicitly report what is missing rather than guessing or fabricating placeholders.
-- **Unavailable Tools:** Capture the exact error message and exit code. Attempt safe retries if transient, or escalate to Coordinator.
-- **Conflicting Instructions:** Halt and flag the conflict for owner review and clarification.
-- **Failed Execution:** Record failure logs and triggers for rollback.
-- **Incomplete Evidence:** Explicitly report unverified claims as UNVERIFIED.
-- **Permission Restrictions:** If an action is blocked by security policy, record the block and request owner approval. Never attempt workarounds.
-
----
-
-## 7. Final Deliverable
-The final deliverable generated by this skill must adhere to this structure:
-
-```markdown
-# Deliverable: [Task / Capability Title]
-**Executing Agent:** `Master Reporting Agent` (`master-reporting-agent`)  
-**Skill Invoked:** `/master-reporting`  
-**Status:** [SUCCESS / BLOCKED / REQUIRES_APPROVAL]  
-
-## Executive Summary
-[Concise summary of findings, code implemented, or workflow completed]
-
-## Detailed Execution Results
-[Structured technical details, data tables, code diffs, or research findings]
-
-## Verifiable Evidence & Artifacts
-- **Artifact Path:** `[file path or database record]`
-- **Verification Status:** `[VERIFIED / UNVERIFIED]`
-- **Audit Event ID:** `[execution event ID]`
-
-## Open Items & Owner Decision Points
-[Any pending approvals, unresolved edge cases, or recommended next steps]
+## 9. Final Deliverable
+The final deliverable from this skill must be rendered in GitHub-flavored Markdown and stored at:
+`~/AI-Workforce/logs/deliverable_<task_id>.md`
+Schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "report_markdown": {
+      "type": "string"
+    },
+    "deliverable_path": {
+      "type": "string"
+    },
+    "summary_metrics": {
+      "type": "object"
+    }
+  }
+}
 ```

@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (activeTab === 'security') {
             loadSecurityAccounts(true);
             loadSecurityHealth();
+        } else if (activeTab === 'models') {
+            loadModelsData();
         } else if (activeTab === 'events') {
             loadGlobalEvents();
         }
@@ -43,11 +45,13 @@ function setupNavigation() {
                 tasks: 'Tasks & Execution',
                 agents: 'Agent Blueprints',
                 security: 'Security & Credentials Vault',
+                models: 'LLM & Model Management',
                 integrator: 'System Integrator & Update Agent',
                 requirements: 'Requirements & Change Engine',
                 events: 'System Execution Audit Log'
             };
             document.getElementById('currentTabTitle').textContent = tabTitleMap[activeTab] || 'Control Center';
+            if (activeTab === 'models') loadModelsData();
             
             // Adjust topbar button based on tab
             const topBtn = document.getElementById('topbarActionBtn');
@@ -804,3 +808,190 @@ async function loadGlobalEvents() {
         console.error('Failed loading events:', e);
     }
 }
+
+// --- LLM & Model Manager Functions ---
+async function loadModelsData() {
+    await loadReasoningStatus();
+    await loadModelProviders();
+    await loadModelsCatalog();
+    await loadModelMetrics();
+}
+
+async function loadReasoningStatus() {
+    try {
+        const res = await fetch('/api/models/status');
+        const data = await res.json();
+        const badge = document.getElementById('reasoningStatusBadge');
+        const notice = document.getElementById('reasoningNoticeText');
+        const activeLabel = document.getElementById('activeModelLabel');
+
+        if (data.is_real_llm_active) {
+            badge.className = 'badge online';
+            badge.textContent = 'LIVE REASONING ACTIVE';
+        } else {
+            badge.className = 'badge warning';
+            badge.textContent = 'OFFLINE SIMULATION (MOCK)';
+        }
+        notice.textContent = data.notice;
+        activeLabel.textContent = `${data.active_model} (${data.classification.toUpperCase()})`;
+    } catch (e) {
+        console.error('Failed to load reasoning status:', e);
+    }
+}
+
+async function loadModelProviders() {
+    try {
+        const res = await fetch('/api/models/providers');
+        const providers = await res.json();
+        const container = document.getElementById('providerGridContainer');
+        if (!container) return;
+
+        container.innerHTML = providers.map(p => {
+            let statusBadge = '<span class="badge warning">Unknown</span>';
+            if (p.health_status === 'healthy') statusBadge = '<span class="badge online">Healthy</span>';
+            else if (p.health_status === 'unreachable') statusBadge = '<span class="badge offline">Unreachable</span>';
+            else if (p.health_status === 'unauthenticated') statusBadge = '<span class="badge warning">No Key</span>';
+
+            const isCloud = p.provider_type.startsWith('cloud_');
+            return `
+                <div class="panel" style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                        <div>
+                            <h3 style="margin:0; font-size:14px; font-weight:600;">${p.name}</h3>
+                            <span style="font-size:11px; color:var(--text-muted);">${p.base_url}</span>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div style="margin-top:12px; display:flex; gap:8px;">
+                        <button class="btn btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="window.testProviderHealth('${p.id}')">Test Connection</button>
+                        ${isCloud ? `<button class="btn btn-primary" style="font-size:11px; padding:4px 8px;" onclick="window.openApiKeyModal('${p.id}', '${p.name}')">Set API Key</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Failed loading providers:', e);
+    }
+}
+
+async function loadModelsCatalog() {
+    try {
+        const res = await fetch('/api/models');
+        const models = await res.json();
+        const container = document.getElementById('modelsGridContainer');
+        if (!container) return;
+
+        container.innerHTML = models.map(m => {
+            const isDef = m.is_default;
+            return `
+                <div class="panel" style="background:var(--bg-card); border:1px solid ${isDef ? 'var(--accent)' : 'var(--border)'}; border-radius:8px; padding:16px; position:relative;">
+                    ${isDef ? '<span style="position:absolute; top:12px; right:12px; background:var(--accent); color:#fff; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:4px;">DEFAULT</span>' : ''}
+                    <h3 style="margin:0 0 4px 0; font-size:14px;">${m.display_name}</h3>
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;"><code>${m.model_name}</code> &bull; ${m.classification.toUpperCase()}</div>
+                    <div style="font-size:11px; margin-bottom:12px; display:flex; gap:4px; flex-wrap:wrap;">
+                        ${(m.capabilities || []).map(c => `<span class="tag" style="font-size:10px;">${c}</span>`).join('')}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:11px; color:var(--text-muted);">Ctx: ${m.context_window.toLocaleString()} tok</span>
+                        ${!isDef ? `<button class="btn btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="window.setDefaultModel('${m.id}')">Make Default</button>` : '<span style="font-size:11px; color:var(--accent); font-weight:600;">Active Default</span>'}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Failed loading models catalog:', e);
+    }
+}
+
+async function loadModelMetrics() {
+    try {
+        const res = await fetch('/api/models/metrics?limit=15');
+        const metrics = await res.json();
+        const tbody = document.getElementById('llmMetricsTableBody');
+        if (!tbody) return;
+
+        if (!metrics.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">No invocation metrics recorded yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = metrics.map(m => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:8px 14px; font-family:monospace; font-size:11px;">${m.timestamp || '-'}</td>
+                <td style="padding:8px 14px;"><strong>${m.agent_id || 'System'}</strong><br><span style="font-size:10px; color:var(--text-muted);">${m.task_id || '-'}</span></td>
+                <td style="padding:8px 14px;">${m.display_name || m.model_id}</td>
+                <td style="padding:8px 14px; font-family:monospace;">${m.prompt_tokens} / ${m.completion_tokens} / ${m.prompt_tokens + m.completion_tokens}</td>
+                <td style="padding:8px 14px; font-family:monospace;">${Math.round(m.latency_ms)} ms</td>
+                <td style="padding:8px 14px;">${m.success ? '<span style="color:var(--online); font-weight:bold;">OK</span>' : '<span style="color:var(--offline); font-weight:bold;">FAILED</span>'}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Failed loading model metrics:', e);
+    }
+}
+
+window.testProviderHealth = async function(providerId) {
+    try {
+        const res = await fetch(`/api/models/providers/${providerId}/health`, { method: 'POST' });
+        const result = await res.json();
+        alert(`Health Check Result for ${providerId}:\nStatus: ${result.status}\nMessage: ${result.message || 'Ready'}`);
+        await loadModelProviders();
+        await loadReasoningStatus();
+    } catch (e) {
+        alert('Failed to execute health check: ' + e);
+    }
+};
+
+window.setDefaultModel = async function(modelId) {
+    try {
+        const res = await fetch('/api/models/default', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model_id: modelId })
+        });
+        if (res.ok) {
+            await loadModelsData();
+        } else {
+            alert('Failed to set default model');
+        }
+    } catch (e) {
+        alert('Error: ' + e);
+    }
+};
+
+window.openApiKeyModal = function(providerId, providerName) {
+    document.getElementById('selectedProviderId').value = providerId;
+    document.getElementById('modalProviderName').value = providerName;
+    document.getElementById('modalProviderApiKey').value = '';
+    document.getElementById('configureApiKeyModal').classList.add('active');
+};
+
+window.closeApiKeyModal = function() {
+    document.getElementById('configureApiKeyModal').classList.remove('active');
+};
+
+window.handleSaveApiKey = async function(e) {
+    e.preventDefault();
+    const providerId = document.getElementById('selectedProviderId').value;
+    const apiKey = document.getElementById('modalProviderApiKey').value;
+
+    try {
+        const res = await fetch(`/api/models/providers/${providerId}/credential`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert('API key securely encrypted with Fernet Vault!');
+            window.closeApiKeyModal();
+            await loadModelProviders();
+            await loadReasoningStatus();
+        } else {
+            alert('Error: ' + (result.detail || 'Failed to save API key'));
+        }
+    } catch (err) {
+        alert('Error saving API key: ' + err);
+    }
+};
+

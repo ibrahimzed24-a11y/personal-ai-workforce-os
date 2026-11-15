@@ -27,6 +27,8 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize SQLite schema & sync declarative blueprints
     logger.info("Initializing AI Workforce OS database...")
     await init_db()
+    logger.info("Initializing baseline LLM providers & models...")
+    await orchestrator.model_manager.initialize_defaults()
     logger.info("Syncing agent blueprints from disk...")
     await orchestrator.sync_blueprints_from_disk()
     logger.info("Scanning incoming capabilities directory...")
@@ -437,6 +439,60 @@ async def get_credential_health():
 @app.get("/api/security/audit")
 async def get_security_audit_logs(limit: int = 100, account_id: Optional[str] = None, agent_id: Optional[str] = None):
     return await creds_mgr.get_audit_logs(limit=limit, account_id=account_id, agent_id=agent_id)
+
+# --- Model Manager API ---
+@app.get("/api/models/status")
+async def get_reasoning_status():
+    """Returns honest audit of active reasoning engine, model, and provider status."""
+    return await orchestrator.model_manager.get_system_reasoning_status()
+
+@app.get("/api/models/providers")
+async def list_model_providers():
+    """Lists all configured LLM providers (Ollama, OpenAI, Gemini, Anthropic, Mock)."""
+    return await orchestrator.model_manager.list_providers()
+
+@app.post("/api/models/providers/{provider_id}/credential")
+async def configure_provider_credential(provider_id: str, payload: Dict[str, Any]):
+    """Encrypts and safely stores API key in Fernet Vault."""
+    api_key = payload.get("api_key", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is required.")
+    return await orchestrator.model_manager.update_provider_credential(provider_id, api_key)
+
+@app.post("/api/models/providers/{provider_id}/health")
+async def check_provider_health(provider_id: str):
+    """Executes live reachability and auth check on provider."""
+    return await orchestrator.model_manager.check_provider_health(provider_id)
+
+@app.get("/api/models")
+async def list_models(active_only: bool = False):
+    """Lists all registered models with capability tags and performance metrics."""
+    return await orchestrator.model_manager.list_models(active_only=active_only)
+
+@app.post("/api/models/default")
+async def set_default_model(payload: Dict[str, Any]):
+    """Sets the system default reasoning model."""
+    model_id = payload.get("model_id")
+    if not model_id:
+        raise HTTPException(status_code=400, detail="model_id is required.")
+    return await orchestrator.model_manager.set_default_model(model_id)
+
+@app.get("/api/models/metrics")
+async def get_model_metrics(limit: int = 50):
+    """Retrieves recent LLM invocation metrics and token counts."""
+    async with get_db_connection() as db:
+        async with db.execute(
+            """
+            SELECT m.*, lm.display_name, lp.name as provider_name
+            FROM llm_usage_metrics m
+            LEFT JOIN llm_models lm ON m.model_id = lm.id
+            LEFT JOIN llm_providers lp ON m.provider_id = lp.id
+            ORDER BY m.timestamp DESC LIMIT ?
+            """,
+            (limit,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
 
 # --- System Health API ---
 @app.get("/api/health")

@@ -8,8 +8,8 @@ from typing import Dict, Any, List, Optional
 import aiosqlite
 
 from core.database import get_db_connection
-from core.models import TaskCreate, TaskResponse, PlanStep, AgentBlueprintModel, SpecialistModel
-from core.adapters.model_provider import DeterministicLocalProvider
+from core.models import TaskCreate, TaskResponse, PlanStep, AgentBlueprintModel, SpecialistModel, ModelGenerationRequest
+from core.model_manager import ModelManager
 from core.adapters.runtime import FileSystemAdapter, TerminalAdapter, PlaywrightAdapter, VerificationAdapter
 
 logger = logging.getLogger("ai_workforce_os.orchestrator")
@@ -18,7 +18,8 @@ CONFIG_AGENTS_DIR = WORKSPACE_ROOT / "config" / "agents"
 
 class Orchestrator:
     def __init__(self):
-        self.model_provider = DeterministicLocalProvider()
+        self.model_manager = ModelManager.get_instance()
+        self.model_provider = self.model_manager
         self.fs_adapter = FileSystemAdapter(WORKSPACE_ROOT)
         self.term_adapter = TerminalAdapter()
         self.browser_adapter = PlaywrightAdapter()
@@ -208,12 +209,23 @@ class Orchestrator:
             """, (task_id, json.dumps({"message": "Coordinator generating execution plan"})))
             await db.commit()
             
-            # Formulate plan via model provider
-            plan_data = await self.model_provider.generate(
-                system_prompt="Formulate execution plan",
-                user_prompt=task["title"],
-                context={"action": "formulate_plan", "task_title": task["title"], "agent_role": "Coordinator Agent"}
+            # Formulate plan via ModelManager
+            plan_response = await self.model_manager.generate(
+                ModelGenerationRequest(
+                    task_type="coordination",
+                    agent_id="coordinator",
+                    system_prompt="Formulate execution plan",
+                    user_prompt=task["title"],
+                    context={
+                        "action": "formulate_plan",
+                        "task_title": task["title"],
+                        "agent_role": "Coordinator Agent",
+                        "task_id": task_id
+                    },
+                    privacy_level="standard"
+                )
             )
+            plan_data = plan_response.parsed_json or {}
             raw_steps = plan_data.get("plan", [])
             plan_id = f"plan_{uuid.uuid4().hex[:8]}"
             
@@ -440,23 +452,55 @@ class Orchestrator:
                 "audit_result": audit_res
             }
             
-        # Default agent execution with three-file composite system prompt
+        # Default agent execution with three-file composite system prompt via ModelManager
         sys_prompt = agent_context["composite_system_prompt"] if agent_context else f"Execute step: {step['title']}"
-        gen = await self.model_provider.generate(
+        model_req = ModelGenerationRequest(
+            task_type=step.get("action_type", "general"),
+            agent_id=agent_id,
             system_prompt=sys_prompt,
             user_prompt=step["description"],
             context={
                 "agent_role": agent_id,
                 "specialist_id": specialist_id,
                 "task_title": task["title"],
+                "task_id": task["id"],
+                "step_id": step.get("id"),
                 "active_skill": agent_context["active_skill"]["slash_command"] if agent_context else None
-            }
+            },
+            privacy_level=task.get("input_context", {}).get("privacy_level", "standard") if isinstance(task.get("input_context"), dict) else "standard"
         )
+        gen_resp = await self.model_manager.generate(model_req)
+        
+        # Log model execution event into immutable audit trail
+        async with get_db_connection() as db:
+            await db.execute("""
+                INSERT INTO execution_events (task_id, step_id, agent_id, event_type, payload)
+                VALUES (?, ?, ?, 'model_invocation', ?)
+            """, (
+                task["id"],
+                step.get("id"),
+                agent_id,
+                json.dumps({
+                    "provider": gen_resp.provider,
+                    "model": gen_resp.model,
+                    "classification": gen_resp.classification,
+                    "latency_ms": round(gen_resp.latency_ms, 2),
+                    "tokens": gen_resp.usage
+                })
+            ))
+            await db.commit()
+
         return {
             "agent": agent_id,
             "specialist": specialist_id,
             "skill_invoked": agent_context["active_skill"]["slash_command"] if agent_context else None,
-            "result": gen
+            "model_used": {
+                "provider": gen_resp.provider,
+                "model": gen_resp.model,
+                "classification": gen_resp.classification,
+                "latency_ms": gen_resp.latency_ms
+            },
+            "result": gen_resp.parsed_json or {"content": gen_resp.content}
         }
 
     def _render_deliverable(self, task: Dict[str, Any], steps: List[Dict[str, Any]]) -> str:

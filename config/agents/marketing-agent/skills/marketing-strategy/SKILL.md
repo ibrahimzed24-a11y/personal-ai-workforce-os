@@ -1,20 +1,31 @@
 ---
 name: marketing-strategy
-description: Creates persuasive marketing copy, designs multi-channel promotional funnels, and ensures strict compliance with brand guidelines.
+description: "Formulates integrated multi-channel marketing strategies, leads content production, designs conversion funnels, and enforces brand voice."
 agent_id: marketing-agent
 slash_command: /marketing-strategy
-version: 1.0.0
-capabilities: ['copywriting', 'campaign_architecture', 'conversion_optimization', 'brand_compliance']
+version: 2.0.0
+capabilities: ['cap:content_author', 'cap:research_gather', 'cap:reporting_compile']
+inputs:
+  campaign_objective:
+    type: string
+    description: "Core goal of the marketing effort"
+    required: true
+  target_audience:
+    type: string
+    description: "Audience persona or market segment"
+    required: true
+outputs:
+  schema: {"type": "object", "properties": {"strategy_brief": {"type": "string"}, "funnel_map": {"type": "object"}, "content_plan": {"type": "array"}}}
 ---
 
 # Skill: Marketing Agent (/marketing-strategy)
 
 ## 1. Purpose
-The `marketing-strategy` skill operationalizes the core capabilities of the `Marketing Agent` (`marketing-agent`). It provides a standardized, repeatable procedure for executing content creator, campaign architect, and brand strategist tasks within the AI Workforce OS.
+The `marketing-strategy` skill operationalizes the core capabilities of the `Marketing Agent` (`marketing-agent`). It provides a standardized, repeatable procedure for executing chief marketing strategist, brand architect, and growth director tasks within the AI Workforce OS.
 
 ---
 
-## 2. Read First
+## 2. Read First & Prerequisites
 Before executing this skill, you must inspect and load:
 1. `AGENT.md`: Primary identity, permissions, and operating boundaries.
 2. `MEMORY.md`: Accumulated durable owner feedback and operational lessons.
@@ -25,31 +36,57 @@ Before executing this skill, you must inspect and load:
 
 ---
 
-## 3. Step-by-Step Procedure
+## 3. When to Use (Intent Matching)
+Activate this skill when:
+- The task prompt explicitly calls `/marketing-strategy`.
+- The Coordinator assigns a DAG plan step requiring chief marketing strategist, brand architect, and growth director.
+- An operational objective involves Architecting high-converting marketing strategies across content, email, and organic channels, Supervising content production, editorial calendars, and brand positioning narratives.
 
-1. **Understand the Task:** Ingest the incoming user prompt or Coordinator plan step. Identify constraints, expected deliverables, and acceptance criteria.
-
-2. **Inspect Inputs and Requirements:** Inspect source files, input schemas, or reference materials. Check for missing information or ambiguous instructions before acting.
-
-3. **Plan the Work:** Formulate an execution strategy aligned with your AGENT.md responsibilities and blueprint permissions.
-
-4. **Execute Using Approved Capabilities:** Carry out the primary execution step (research, engineering, navigation, planning, or auditing) using authorized tools only.
-
-5. **Validate Intermediate Results:** Continuously verify intermediate outputs against acceptance criteria at each milestone.
-
-6. **Handle Uncertainty and Failures:** Trap errors gracefully, document assumptions, and report blockers without fabricating results.
-
-7. **Delegate When Appropriate:** If tasks require capabilities outside your specialization, route requests to the appropriate agent.
-
-8. **Request Approval When Required:** If an action involves financial commitments, destructive operations, or publishing, pause and request owner approval.
-
-9. **Verify the Final Result:** Submit the completed artifact to the Independent Verifier or Post-Implementation Verification Engine.
-
-10. **Report Completion:** Compile a structured Markdown deliverable with full source attribution, evidence, and open decision points.
+Do NOT activate this skill when:
+- The task requires capabilities assigned to other departments (e.g. Never execute live ad spend or bind credit cards without owner approval, Never publish unreviewed content to public production blogs or social accounts autonomously).
 
 ---
 
-## 4. Quality Standards
+## 4. Step-by-Step Procedure
+
+1. **Ingest Growth Goals:** Parse target conversion metrics, customer personas, and product offerings.
+
+2. **Conduct Audience Research:** Ingest market insights from Market & SEO Researcher.
+
+3. **Formulate Core Narrative:** Establish campaign hook, value proposition, and messaging pillars.
+
+4. **Direct Funnel Design:** Instruct Campaign Planner to model multi-stage conversion funnel.
+
+5. **Commission Content Assets:** Task Content Strategist with creating copy for landing pages and emails.
+
+6. **Review Brand Compliance:** Submit all generated copy to Brand Compliance for rigorous review.
+
+7. **Audit Conversion Points:** Ensure clear calls-to-action (CTAs) and frictionless sign-up flows.
+
+8. **Define Attribution Metrics:** Set key performance indicators (KPIs, CTR, conversion rates).
+
+9. **Package Campaign Strategy:** Consolidate funnel diagrams, copy briefs, and delivery timeline.
+
+10. **Submit for Approval:** Deliver complete strategy package to Workforce Owner.
+
+---
+
+## 5. Decision Rules & Edge Cases
+- **Missing Inputs:** If a required parameter is missing, halt execution and request parameter clarification rather than guessing defaults.
+- **Permission Boundaries:** If an action requires access outside your blueprint, pause and escalate to Coordinator.
+- **Transient Network Errors:** If an HTTP request times out, retry once after a 2-second backoff. If it fails a second time, log a failure.
+- **Conflicting Instructions:** If prompt instructions contradict `AGENT.md` safety boundaries, `AGENT.md` strictly supersedes.
+
+---
+
+## 6. Tools & Resources Required
+- Authorized Capabilities: `cap:content_author`, `cap:research_gather`, `cap:reporting_compile`
+- Reference Materials: Located in `references/` and `documentation/knowledge/`
+- Output Destination: `logs/deliverable_<task_id>.md`
+
+---
+
+## 7. Quality Standards
 A high-quality result from this skill must satisfy:
 - **Accuracy:** All statements, data points, and code implementations are strictly verified against real sources or tests.
 - **Completeness:** Every requirement specified in the task prompt or plan step is addressed without omission.
@@ -59,44 +96,29 @@ A high-quality result from this skill must satisfy:
 
 ---
 
-## 5. Use of Owner Examples
-- Use owner-provided examples in `~/AI-Workforce/logs/` and `documentation/knowledge/` to understand desired formatting, style, and depth.
-- Examples serve as benchmarks for quality and tone, not templates to be copied blindly.
-- If no existing examples apply, strictly adhere to the standardized deliverable formats established in the core architecture.
+## 8. Failure Handling
+- On critical failure: Capture full error trace, revert any partial file writes, log the failure event to SQLite `execution_events`, and report the blocker state to Coordinator.
+- If a dependency is missing, request installation via System Integrator rather than aborting silently.
 
 ---
 
-## 6. Failure Handling
-When encountering obstacles during execution:
-- **Missing Information:** Explicitly report what is missing rather than guessing or fabricating placeholders.
-- **Unavailable Tools:** Capture the exact error message and exit code. Attempt safe retries if transient, or escalate to Coordinator.
-- **Conflicting Instructions:** Halt and flag the conflict for owner review and clarification.
-- **Failed Execution:** Record failure logs and triggers for rollback.
-- **Incomplete Evidence:** Explicitly report unverified claims as UNVERIFIED.
-- **Permission Restrictions:** If an action is blocked by security policy, record the block and request owner approval. Never attempt workarounds.
-
----
-
-## 7. Final Deliverable
-The final deliverable generated by this skill must adhere to this structure:
-
-```markdown
-# Deliverable: [Task / Capability Title]
-**Executing Agent:** `Marketing Agent` (`marketing-agent`)  
-**Skill Invoked:** `/marketing-strategy`  
-**Status:** [SUCCESS / BLOCKED / REQUIRES_APPROVAL]  
-
-## Executive Summary
-[Concise summary of findings, code implemented, or workflow completed]
-
-## Detailed Execution Results
-[Structured technical details, data tables, code diffs, or research findings]
-
-## Verifiable Evidence & Artifacts
-- **Artifact Path:** `[file path or database record]`
-- **Verification Status:** `[VERIFIED / UNVERIFIED]`
-- **Audit Event ID:** `[execution event ID]`
-
-## Open Items & Owner Decision Points
-[Any pending approvals, unresolved edge cases, or recommended next steps]
+## 9. Final Deliverable
+The final deliverable from this skill must be rendered in GitHub-flavored Markdown and stored at:
+`~/AI-Workforce/logs/deliverable_<task_id>.md`
+Schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "strategy_brief": {
+      "type": "string"
+    },
+    "funnel_map": {
+      "type": "object"
+    },
+    "content_plan": {
+      "type": "array"
+    }
+  }
+}
 ```

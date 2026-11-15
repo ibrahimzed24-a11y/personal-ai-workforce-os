@@ -1,10 +1,17 @@
 ---
 name: knowledge-synchronization
-description: Maps approved capabilities to authorized agents, updates SKILLS_INDEX.md, AVAILABLE_CAPABILITIES.md, and AGENT_TOOL_ACCESS.json.
+description: "Maps approved capabilities to authorized agents, updates SKILLS_INDEX.md, AVAILABLE_CAPABILITIES.md, and AGENT_TOOL_ACCESS.json."
 agent_id: capability-knowledge-synchronizer
 slash_command: /knowledge-synchronization
-version: 1.0.0
-capabilities: ['blueprint_updating', 'documentation_generation', 'tool_binding', 'capability_cataloging']
+version: 2.0.0
+capabilities: ['cap:file_io', 'cap:reporting_compile']
+inputs:
+  asset_id:
+    type: string
+    description: "Installed asset ID to synchronize"
+    required: false
+outputs:
+  schema: {"type": "object", "properties": {"synchronized_files": {"type": "array"}, "skills_indexed_count": {"type": "number"}}}
 ---
 
 # Skill: Capability & Knowledge Synchronizer Specialist (/knowledge-synchronization)
@@ -14,7 +21,7 @@ The `knowledge-synchronization` skill operationalizes the core capabilities of t
 
 ---
 
-## 2. Read First
+## 2. Read First & Prerequisites
 Before executing this skill, you must inspect and load:
 1. `AGENT.md`: Primary identity, permissions, and operating boundaries.
 2. `MEMORY.md`: Accumulated durable owner feedback and operational lessons.
@@ -25,31 +32,57 @@ Before executing this skill, you must inspect and load:
 
 ---
 
-## 3. Step-by-Step Procedure
+## 3. When to Use (Intent Matching)
+Activate this skill when:
+- The task prompt explicitly calls `/knowledge-synchronization`.
+- The Coordinator assigns a DAG plan step requiring agent capability binding and operational knowledge synchronizer.
+- An operational objective involves Mapping newly verified tools and skills to authorized agent blueprints, Regenerating `INSTALLED_ASSETS.md` with active asset metadata from SQLite.
 
-1. **Understand the Task:** Ingest the incoming user prompt or Coordinator plan step. Identify constraints, expected deliverables, and acceptance criteria.
-
-2. **Inspect Inputs and Requirements:** Inspect source files, input schemas, or reference materials. Check for missing information or ambiguous instructions before acting.
-
-3. **Plan the Work:** Formulate an execution strategy aligned with your AGENT.md responsibilities and blueprint permissions.
-
-4. **Execute Using Approved Capabilities:** Carry out the primary execution step (research, engineering, navigation, planning, or auditing) using authorized tools only.
-
-5. **Validate Intermediate Results:** Continuously verify intermediate outputs against acceptance criteria at each milestone.
-
-6. **Handle Uncertainty and Failures:** Trap errors gracefully, document assumptions, and report blockers without fabricating results.
-
-7. **Delegate When Appropriate:** If tasks require capabilities outside your specialization, route requests to the appropriate agent.
-
-8. **Request Approval When Required:** If an action involves financial commitments, destructive operations, or publishing, pause and request owner approval.
-
-9. **Verify the Final Result:** Submit the completed artifact to the Independent Verifier or Post-Implementation Verification Engine.
-
-10. **Report Completion:** Compile a structured Markdown deliverable with full source attribution, evidence, and open decision points.
+Do NOT activate this skill when:
+- The task requires capabilities assigned to other departments (e.g. Never copy asset files or execute installation commands (handled by Package Installer), Never grant tool permissions to agents without blueprint compatibility check).
 
 ---
 
-## 4. Quality Standards
+## 4. Step-by-Step Procedure
+
+1. **Query Installed Assets:** Load all active records from `installed_assets` table in SQLite.
+
+2. **Scan Agent Skills:** Traverse all 32 agent directories in `config/agents/*/skills/*/SKILL.md`.
+
+3. **Parse Skill Frontmatter:** Extract `name`, `slash_command`, `version`, and `capabilities`.
+
+4. **Compile SKILLS_INDEX.md:** Generate updated markdown index linking every skill to its agent.
+
+5. **Compile AVAILABLE_CAPABILITIES.md:** Document all active system tools, scripts, and runtime adapters.
+
+6. **Generate AGENT_TOOL_ACCESS.json:** Build JSON map of agent IDs to authorized capabilities.
+
+7. **Audit for Dead Links:** Confirm every referenced file path exists on disk.
+
+8. **Validate JSON Syntax:** Verify `AGENT_TOOL_ACCESS.json` passes strict JSON validation.
+
+9. **Commit Knowledge Updates:** Write updated files to `documentation/knowledge/`.
+
+10. **Broadcast Awareness:** Notify Coordinator that workforce operational knowledge is synchronized.
+
+---
+
+## 5. Decision Rules & Edge Cases
+- **Missing Inputs:** If a required parameter is missing, halt execution and request parameter clarification rather than guessing defaults.
+- **Permission Boundaries:** If an action requires access outside your blueprint, pause and escalate to Coordinator.
+- **Transient Network Errors:** If an HTTP request times out, retry once after a 2-second backoff. If it fails a second time, log a failure.
+- **Conflicting Instructions:** If prompt instructions contradict `AGENT.md` safety boundaries, `AGENT.md` strictly supersedes.
+
+---
+
+## 6. Tools & Resources Required
+- Authorized Capabilities: `cap:file_io`, `cap:reporting_compile`
+- Reference Materials: Located in `references/` and `documentation/knowledge/`
+- Output Destination: `logs/deliverable_<task_id>.md`
+
+---
+
+## 7. Quality Standards
 A high-quality result from this skill must satisfy:
 - **Accuracy:** All statements, data points, and code implementations are strictly verified against real sources or tests.
 - **Completeness:** Every requirement specified in the task prompt or plan step is addressed without omission.
@@ -59,44 +92,26 @@ A high-quality result from this skill must satisfy:
 
 ---
 
-## 5. Use of Owner Examples
-- Use owner-provided examples in `~/AI-Workforce/logs/` and `documentation/knowledge/` to understand desired formatting, style, and depth.
-- Examples serve as benchmarks for quality and tone, not templates to be copied blindly.
-- If no existing examples apply, strictly adhere to the standardized deliverable formats established in the core architecture.
+## 8. Failure Handling
+- On critical failure: Capture full error trace, revert any partial file writes, log the failure event to SQLite `execution_events`, and report the blocker state to Coordinator.
+- If a dependency is missing, request installation via System Integrator rather than aborting silently.
 
 ---
 
-## 6. Failure Handling
-When encountering obstacles during execution:
-- **Missing Information:** Explicitly report what is missing rather than guessing or fabricating placeholders.
-- **Unavailable Tools:** Capture the exact error message and exit code. Attempt safe retries if transient, or escalate to Coordinator.
-- **Conflicting Instructions:** Halt and flag the conflict for owner review and clarification.
-- **Failed Execution:** Record failure logs and triggers for rollback.
-- **Incomplete Evidence:** Explicitly report unverified claims as UNVERIFIED.
-- **Permission Restrictions:** If an action is blocked by security policy, record the block and request owner approval. Never attempt workarounds.
-
----
-
-## 7. Final Deliverable
-The final deliverable generated by this skill must adhere to this structure:
-
-```markdown
-# Deliverable: [Task / Capability Title]
-**Executing Agent:** `Capability & Knowledge Synchronizer Specialist` (`capability-knowledge-synchronizer`)  
-**Skill Invoked:** `/knowledge-synchronization`  
-**Status:** [SUCCESS / BLOCKED / REQUIRES_APPROVAL]  
-
-## Executive Summary
-[Concise summary of findings, code implemented, or workflow completed]
-
-## Detailed Execution Results
-[Structured technical details, data tables, code diffs, or research findings]
-
-## Verifiable Evidence & Artifacts
-- **Artifact Path:** `[file path or database record]`
-- **Verification Status:** `[VERIFIED / UNVERIFIED]`
-- **Audit Event ID:** `[execution event ID]`
-
-## Open Items & Owner Decision Points
-[Any pending approvals, unresolved edge cases, or recommended next steps]
+## 9. Final Deliverable
+The final deliverable from this skill must be rendered in GitHub-flavored Markdown and stored at:
+`~/AI-Workforce/logs/deliverable_<task_id>.md`
+Schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "synchronized_files": {
+      "type": "array"
+    },
+    "skills_indexed_count": {
+      "type": "number"
+    }
+  }
+}
 ```

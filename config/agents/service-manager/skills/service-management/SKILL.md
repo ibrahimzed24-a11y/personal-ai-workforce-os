@@ -1,20 +1,27 @@
 ---
 name: service-management
-description: Manages background daemon lifecycles, monitors PID files, executes graceful shutdowns, and inspects port bindings.
+description: "Controls local daemon processes, binds ports, inspects process health, and executes clean shutdowns."
 agent_id: service-manager
 slash_command: /service-management
-version: 1.0.0
-capabilities: ['process_monitoring', 'signal_handling', 'port_inspection']
+version: 2.0.0
+capabilities: ['cap:service_manage', 'cap:code_execute']
+inputs:
+  service_action:
+    type: string
+    description: "start, stop, restart, status"
+    required: true
+outputs:
+  schema: {"type": "object", "properties": {"service_status": {"type": "string"}, "pid": {"type": "number"}, "port_binding": {"type": "string"}}}
 ---
 
-# Skill: Service Manager Specialist (/service-management)
+# Skill: Local Service Manager Specialist (/service-management)
 
 ## 1. Purpose
-The `service-management` skill operationalizes the core capabilities of the `Service Manager Specialist` (`service-manager`). It provides a standardized, repeatable procedure for executing daemon lifecycle, pid tracking, and process health specialist tasks within the AI Workforce OS.
+The `service-management` skill operationalizes the core capabilities of the `Local Service Manager Specialist` (`service-manager`). It provides a standardized, repeatable procedure for executing process controller, pid lifecycle manager, and port supervisor tasks within the AI Workforce OS.
 
 ---
 
-## 2. Read First
+## 2. Read First & Prerequisites
 Before executing this skill, you must inspect and load:
 1. `AGENT.md`: Primary identity, permissions, and operating boundaries.
 2. `MEMORY.md`: Accumulated durable owner feedback and operational lessons.
@@ -25,31 +32,57 @@ Before executing this skill, you must inspect and load:
 
 ---
 
-## 3. Step-by-Step Procedure
+## 3. When to Use (Intent Matching)
+Activate this skill when:
+- The task prompt explicitly calls `/service-management`.
+- The Coordinator assigns a DAG plan step requiring process controller, pid lifecycle manager, and port supervisor.
+- An operational objective involves Starting, stopping, and restarting the OS FastAPI daemon using `./start_os.sh` and `./stop_os.sh`, Monitoring PID status, process memory consumption, and port 8765 bindings.
 
-1. **Understand the Task:** Ingest the incoming user prompt or Coordinator plan step. Identify constraints, expected deliverables, and acceptance criteria.
-
-2. **Inspect Inputs and Requirements:** Inspect source files, input schemas, or reference materials. Check for missing information or ambiguous instructions before acting.
-
-3. **Plan the Work:** Formulate an execution strategy aligned with your AGENT.md responsibilities and blueprint permissions.
-
-4. **Execute Using Approved Capabilities:** Carry out the primary execution step (research, engineering, navigation, planning, or auditing) using authorized tools only.
-
-5. **Validate Intermediate Results:** Continuously verify intermediate outputs against acceptance criteria at each milestone.
-
-6. **Handle Uncertainty and Failures:** Trap errors gracefully, document assumptions, and report blockers without fabricating results.
-
-7. **Delegate When Appropriate:** If tasks require capabilities outside your specialization, route requests to the appropriate agent.
-
-8. **Request Approval When Required:** If an action involves financial commitments, destructive operations, or publishing, pause and request owner approval.
-
-9. **Verify the Final Result:** Submit the completed artifact to the Independent Verifier or Post-Implementation Verification Engine.
-
-10. **Report Completion:** Compile a structured Markdown deliverable with full source attribution, evidence, and open decision points.
+Do NOT activate this skill when:
+- The task requires capabilities assigned to other departments (e.g. Never kill unrelated system processes belonging to other macOS applications, Never force ungraceful `kill -9` unless graceful `SIGTERM` has timed out after 10 seconds).
 
 ---
 
-## 4. Quality Standards
+## 4. Step-by-Step Procedure
+
+1. **Check Current Service Status:** Inspect `ps aux | grep app.py` and query port 8765.
+
+2. **Parse Action Directive:** Determine whether command is start, stop, or restart.
+
+3. **Execute Stop (if requested):** Execute `./stop_os.sh`, sending `SIGTERM` to active PID.
+
+4. **Wait for Port Release:** Verify port 8765 is completely released by operating system.
+
+5. **Execute Start (if requested):** Run `./start_os.sh` in background with output redirected to `logs/os.log`.
+
+6. **Capture Active PID:** Read spawned process PID from `./logs/os.pid` or process table.
+
+7. **Poll Health Endpoint:** Query `http://127.0.0.1:8765/api/health` every 1s for up to 10s.
+
+8. **Inspect Process Memory:** Verify memory consumption is within safe bounds (<300MB RAM).
+
+9. **Check Log Stream:** Inspect `tail -n 20 logs/os.log` for any startup warnings or exceptions.
+
+10. **Deliver Service Report:** Return active PID and binding confirmation to Deployment Lead.
+
+---
+
+## 5. Decision Rules & Edge Cases
+- **Missing Inputs:** If a required parameter is missing, halt execution and request parameter clarification rather than guessing defaults.
+- **Permission Boundaries:** If an action requires access outside your blueprint, pause and escalate to Coordinator.
+- **Transient Network Errors:** If an HTTP request times out, retry once after a 2-second backoff. If it fails a second time, log a failure.
+- **Conflicting Instructions:** If prompt instructions contradict `AGENT.md` safety boundaries, `AGENT.md` strictly supersedes.
+
+---
+
+## 6. Tools & Resources Required
+- Authorized Capabilities: `cap:service_manage`, `cap:code_execute`
+- Reference Materials: Located in `references/` and `documentation/knowledge/`
+- Output Destination: `logs/deliverable_<task_id>.md`
+
+---
+
+## 7. Quality Standards
 A high-quality result from this skill must satisfy:
 - **Accuracy:** All statements, data points, and code implementations are strictly verified against real sources or tests.
 - **Completeness:** Every requirement specified in the task prompt or plan step is addressed without omission.
@@ -59,44 +92,29 @@ A high-quality result from this skill must satisfy:
 
 ---
 
-## 5. Use of Owner Examples
-- Use owner-provided examples in `~/AI-Workforce/logs/` and `documentation/knowledge/` to understand desired formatting, style, and depth.
-- Examples serve as benchmarks for quality and tone, not templates to be copied blindly.
-- If no existing examples apply, strictly adhere to the standardized deliverable formats established in the core architecture.
+## 8. Failure Handling
+- On critical failure: Capture full error trace, revert any partial file writes, log the failure event to SQLite `execution_events`, and report the blocker state to Coordinator.
+- If a dependency is missing, request installation via System Integrator rather than aborting silently.
 
 ---
 
-## 6. Failure Handling
-When encountering obstacles during execution:
-- **Missing Information:** Explicitly report what is missing rather than guessing or fabricating placeholders.
-- **Unavailable Tools:** Capture the exact error message and exit code. Attempt safe retries if transient, or escalate to Coordinator.
-- **Conflicting Instructions:** Halt and flag the conflict for owner review and clarification.
-- **Failed Execution:** Record failure logs and triggers for rollback.
-- **Incomplete Evidence:** Explicitly report unverified claims as UNVERIFIED.
-- **Permission Restrictions:** If an action is blocked by security policy, record the block and request owner approval. Never attempt workarounds.
-
----
-
-## 7. Final Deliverable
-The final deliverable generated by this skill must adhere to this structure:
-
-```markdown
-# Deliverable: [Task / Capability Title]
-**Executing Agent:** `Service Manager Specialist` (`service-manager`)  
-**Skill Invoked:** `/service-management`  
-**Status:** [SUCCESS / BLOCKED / REQUIRES_APPROVAL]  
-
-## Executive Summary
-[Concise summary of findings, code implemented, or workflow completed]
-
-## Detailed Execution Results
-[Structured technical details, data tables, code diffs, or research findings]
-
-## Verifiable Evidence & Artifacts
-- **Artifact Path:** `[file path or database record]`
-- **Verification Status:** `[VERIFIED / UNVERIFIED]`
-- **Audit Event ID:** `[execution event ID]`
-
-## Open Items & Owner Decision Points
-[Any pending approvals, unresolved edge cases, or recommended next steps]
+## 9. Final Deliverable
+The final deliverable from this skill must be rendered in GitHub-flavored Markdown and stored at:
+`~/AI-Workforce/logs/deliverable_<task_id>.md`
+Schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "service_status": {
+      "type": "string"
+    },
+    "pid": {
+      "type": "number"
+    },
+    "port_binding": {
+      "type": "string"
+    }
+  }
+}
 ```

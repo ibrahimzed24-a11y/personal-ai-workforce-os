@@ -1,5 +1,49 @@
 {
+  "master-reporting-agent": [
+    {
+      "asset_id": "asset_1488c6e9",
+      "name": "audit_sample_skill",
+      "category": "skill",
+      "path": "config/skills/audit_sample_skill/SKILL.md",
+      "capabilities": [
+        "skill:audit_sample_skill"
+      ]
+    }
+  ],
+  "deployment-agent": [
+    {
+      "asset_id": "asset_1488c6e9",
+      "name": "audit_sample_skill",
+      "category": "skill",
+      "path": "config/skills/audit_sample_skill/SKILL.md",
+      "capabilities": [
+        "skill:audit_sample_skill"
+      ]
+    }
+  ],
+  "system-integrator-update-agent": [
+    {
+      "asset_id": "asset_1488c6e9",
+      "name": "audit_sample_skill",
+      "category": "skill",
+      "path": "config/skills/audit_sample_skill/SKILL.md",
+      "capabilities": [
+        "skill:audit_sample_skill"
+      ]
+    }
+  ],
   "coordinator": [
+    {
+      "asset_id": "asset_1488c6e9",
+      "name": "audit_sample_skill",
+      "category": "skill",
+      "path": "config/skills/audit_sample_skill/SKILL.md",
+      "capabilities": [
+        "skill:audit_sample_skill"
+      ]
+    }
+  ],
+  "software-engineer": [
     {
       "asset_id": "asset_1488c6e9",
       "name": "audit_sample_skill",
