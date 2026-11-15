@@ -295,8 +295,11 @@ class AgentContextLoader:
         if auto_apply:
             date_str = datetime.utcnow().strftime("%Y-%m-%d")
             lesson_entry = f"\n- [{date_str}] ({author}): {clean_feedback}\n"
-            with open(mem_file, "a", encoding="utf-8") as f:
-                f.write(lesson_entry)
+            try:
+                with open(mem_file, "a", encoding="utf-8") as f:
+                    f.write(lesson_entry)
+            except OSError as err:
+                logger.warning(f"Could not persist lesson to {mem_file}: {err}")
             proposal["applied_at"] = datetime.utcnow().isoformat()
             
             # Record execution event in database if task_id exists

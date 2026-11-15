@@ -88,8 +88,42 @@ async def health():
     }
 
 
+@app.post("/api/agy/execute")
+async def local_agy_execute(req: dict):
+    prompt = req.get("prompt", "")
+    model = req.get("model")
+    agy_bin = "/Users/ibrahimzid/.local/bin/agy"
+    if not os.path.exists(agy_bin):
+        return {"output": "Antigravity CLI binary not found at /Users/ibrahimzid/.local/bin/agy", "status": "error"}
+    
+    cmd = [agy_bin, "--dangerously-skip-permissions", "-p", prompt]
+    if model and model != "antigravity":
+        cmd.extend(["--model", model])
+    
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60.0)
+        output = stdout.decode("utf-8").strip() or stderr.decode("utf-8").strip()
+        return {
+            "output": output,
+            "status": "ok" if proc.returncode == 0 else "error",
+            "model": model or "gemini-3.8-flash-high"
+        }
+    except Exception as exc:
+        return {"output": f"AGY execution error: {str(exc)}", "status": "error", "model": model}
+
+
 @app.post("/execute")
 async def execute_local(req: LocalExecRequest):
+    # If explicit antigravity engine or model
+    if getattr(req, "engine", None) in ("antigravity", "agy") or (req.model and any(m in req.model for m in ["gemini-3.8", "claude-sonnet-4-6", "claude-opus-4-6", "gpt-oss"])):
+        agy_res = await local_agy_execute({"prompt": f"{req.system}\n\n{req.prompt}", "model": req.model})
+        return {"output": agy_res.get("output", ""), "model": req.model, "engine": "antigravity_cli"}
+
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             res = await client.post(
@@ -102,8 +136,15 @@ async def execute_local(req: LocalExecRequest):
                 },
             )
             res.raise_for_status()
-            return {"output": res.json().get("response", ""), "model": req.model}
+            return {"output": res.json().get("response", ""), "model": req.model, "engine": "ollama"}
     except Exception as exc:
+        # Fallback to agy CLI on local node
+        agy_bin = "/Users/ibrahimzid/.local/bin/agy"
+        if os.path.exists(agy_bin):
+            agy_res = await local_agy_execute({"prompt": f"{req.system}\n\n{req.prompt}", "model": req.model})
+            if agy_res.get("status") == "ok":
+                return {"output": agy_res.get("output", ""), "model": req.model, "engine": "antigravity_cli"}
+
         return {
             "output": f"Local worker online. Executed via fallback coordinator: {req.prompt[:100]}...",
             "model": req.model,
@@ -345,12 +386,8 @@ async def local_connectors():
 
 @app.post("/api/connectors/{connector_id}/test")
 async def local_test_connector(connector_id: str):
-    return {
-        "status": "ok",
-        "connector_id": connector_id,
-        "connection_test": "passed",
-        "latency_ms": 18
-    }
+    from api.index import test_connector
+    return await test_connector(connector_id)
 
 @app.get("/api/agents")
 async def local_agents():

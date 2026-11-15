@@ -16,6 +16,19 @@ let workerOnline = false;
 let isSignUpMode = false;
 
 const LLM_PROVIDERS = {
+  antigravity: {
+    name: 'AntiGravity Sovereign Daemon (CLI)',
+    default_model: 'gemini-3.8-flash-high',
+    models: [
+      'gemini-3.8-flash-high',
+      'gemini-3.8-flash-medium',
+      'gemini-3.8-flash-low',
+      'claude-sonnet-4-6',
+      'claude-opus-4-6-thinking',
+      'gpt-oss-120b-medium',
+    ],
+    placeholder_key: 'Local Binary: /Users/ibrahimzid/.local/bin/agy',
+  },
   gemini: {
     name: 'Google Gemini',
     default_model: 'gemini-2.5-flash',
@@ -123,14 +136,14 @@ function updateActiveModelBadge(project) {
   if (mode === 'cloud_api') {
     const provName = LLM_PROVIDERS[project.llm_provider]?.name || project.llm_provider || 'Cloud';
     const model = project.llm_model || 'gemini-2.5-flash';
-    badge.textContent = `⚡ ${provName}: ${model}`;
+    badge.innerHTML = `<span class="dot emerald" style="width:6px;height:6px;"></span> ${escapeHtml(provName)}: ${escapeHtml(model)}`;
     badge.classList.add('model-badge-cloud');
   } else if (mode === 'local_llm') {
     const model = project.llm_model || 'qwen2.5-coder:7b';
-    badge.textContent = `💻 Local: ${model}`;
+    badge.innerHTML = `<span class="dot blue" style="width:6px;height:6px;"></span> Local: ${escapeHtml(model)}`;
     badge.classList.add('model-badge-local');
   } else {
-    badge.textContent = '🛡️ AntiGravity Sovereign';
+    badge.innerHTML = `<span class="dot emerald" style="width:6px;height:6px;"></span> AntiGravity Sovereign`;
     badge.classList.add('model-badge-default');
   }
 }

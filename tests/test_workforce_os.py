@@ -69,6 +69,7 @@ def test_llm_providers_catalog():
     assert res.status_code == 200
     providers = res.json().get("providers", [])
     provider_ids = [p["id"] for p in providers]
+    assert "antigravity" in provider_ids
     assert "gemini" in provider_ids
     assert "openai" in provider_ids
     assert "anthropic" in provider_ids
@@ -81,6 +82,7 @@ def test_llm_providers_catalog():
     local_res = worker_client.get("/api/models/providers")
     assert local_res.status_code == 200
     local_ids = [p["id"] for p in local_res.json().get("providers", [])]
+    assert "antigravity" in local_ids
     assert "gemini" in local_ids
     assert "ollama" in local_ids
 
@@ -246,4 +248,42 @@ def test_permanent_framework_skills_and_events():
     ev_res = cloud_client.get("/api/events")
     assert ev_res.status_code == 200
     assert "events" in ev_res.json()
+
+
+def test_connectors_catalog_and_test():
+    res = cloud_client.get("/api/connectors")
+    assert res.status_code == 200
+    data = res.json()
+    assert "connectors" in data
+    ids = [c["id"] for c in data["connectors"]]
+    assert "antigravity-cli" in ids
+    assert "browser-use" in ids
+    assert "google-search-console" in ids
+    assert "gmail" in ids
+    assert "google-calendar" in ids
+
+    # Test connector probe
+    t_res = cloud_client.post("/api/connectors/antigravity-cli/test")
+    assert t_res.status_code == 200
+    assert t_res.json()["connector_id"] == "antigravity-cli"
+
+
+def test_serverless_read_only_resilience():
+    from core.exporter import get_project_root, generate_and_save_stage_report
+    # Ensure get_project_root returns a valid directory that can be created
+    p = get_project_root("serverless-resilience-check")
+    assert p.exists()
+
+    # Generate report and ensure it completes with VERIFIED status
+    rep = generate_and_save_stage_report(
+        project_slug="serverless-resilience-check",
+        task_id="task-err30-guard",
+        agent_id="coordinator",
+        step_index=1,
+        title="Serverless Safe Report",
+        sections={"Test": "Passed"},
+        file_format="pdf"
+    )
+    assert rep["verification_status"] == "VERIFIED"
+    assert rep["file_size"] > 0
 

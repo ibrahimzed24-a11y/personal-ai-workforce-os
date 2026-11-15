@@ -493,9 +493,6 @@ class SystemIntegratorEngine:
         for a in assets:
             plan = a["installation_plan"]
             assets_md.append(f"| `{a['id']}` | **{a['name']}** | {a['category']} | {a.get('version', '1.0.0')} | `{a['status']}` | `{plan.get('target_path', 'N/A')}` |")
-        with open(KNOWLEDGE_DIR / "INSTALLED_ASSETS.md", "w", encoding="utf-8") as f:
-            f.write("\n".join(assets_md) + "\n")
-
         # 2. AVAILABLE_CAPABILITIES.md
         cap_md = ["# Operational Knowledge: Available Capabilities Catalog\n", "The following capabilities are actively available across the AI Workforce OS:\n"]
         for a in active_assets:
@@ -515,9 +512,6 @@ class SystemIntegratorEngine:
                 cap_md.append(f"- **`{s_det['slash_command']}`** (`{ag_info['agent_id']}`): {s_det['description']} (Path: `{s_det['path']}`)")
         cap_md.append("\n")
 
-        with open(KNOWLEDGE_DIR / "AVAILABLE_CAPABILITIES.md", "w", encoding="utf-8") as f:
-            f.write("\n".join(cap_md) + "\n")
-
         # 3. SKILLS_INDEX.md
         skills = [a for a in active_assets if a["category"] == "skill"]
         skills_md = ["# Operational Knowledge: Skills Index\n", "Index of verified, active agent skills in the OS:\n"]
@@ -535,9 +529,6 @@ class SystemIntegratorEngine:
             skills_md.append("\n### Permanent Sovereign Harnesses & Framework Skills:\n")
             for ps in perm_skills:
                 skills_md.append(f"- **`{ps['slash_command']}`** ([{ps['category']}] {ps['name']}): `{ps['path']}` - {ps['description']}")
-                
-        with open(KNOWLEDGE_DIR / "SKILLS_INDEX.md", "w", encoding="utf-8") as f:
-            f.write("\n".join(skills_md) + "\n")
 
         # 4. AGENT_TOOL_ACCESS.json
         agent_tool_map = {}
@@ -552,7 +543,16 @@ class SystemIntegratorEngine:
                     "path": a["installation_plan"].get("target_path"),
                     "capabilities": a["capabilities_added"]
                 })
-        with open(KNOWLEDGE_DIR / "AGENT_TOOL_ACCESS.json", "w", encoding="utf-8") as f:
-            json.dump(agent_tool_map, f, indent=2)
-            
-        logger.info("Synchronized operational knowledge records to documentation/knowledge/.")
+
+        try:
+            with open(KNOWLEDGE_DIR / "INSTALLED_ASSETS.md", "w", encoding="utf-8") as f:
+                f.write("\n".join(assets_md) + "\n")
+            with open(KNOWLEDGE_DIR / "AVAILABLE_CAPABILITIES.md", "w", encoding="utf-8") as f:
+                f.write("\n".join(cap_md) + "\n")
+            with open(KNOWLEDGE_DIR / "SKILLS_INDEX.md", "w", encoding="utf-8") as f:
+                f.write("\n".join(skills_md) + "\n")
+            with open(KNOWLEDGE_DIR / "AGENT_TOOL_ACCESS.json", "w", encoding="utf-8") as f:
+                json.dump(agent_tool_map, f, indent=2)
+            logger.info("Synchronized operational knowledge records to documentation/knowledge/.")
+        except OSError as e:
+            logger.warning(f"Could not persist operational knowledge to disk: {e}")
