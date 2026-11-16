@@ -528,7 +528,7 @@ function renderDocuments(docs) {
   if (docs.length === 0) {
     container.innerHTML = `
       <div class="empty-card" style="padding:1.75rem;">
-        <p class="subtext" style="margin:0;">No core files attached to this project yet. Drag & drop lead spreadsheets (.csv, .xlsx) or PDF guidelines above so your agents can access them.</p>
+        <p class="subtext" style="margin:0;">No core files attached to this project yet. Drag & drop lead spreadsheets (.csv, .xlsx), documents (.pdf, .html), or PNG visual assets above so your agents can access them.</p>
       </div>`;
     return;
   }
@@ -543,6 +543,15 @@ function renderDocuments(docs) {
       else if (ext === 'xlsx' || ext === 'xls') {
         badgeClass = 'doc-badge-xlsx';
         iconText = 'XLS';
+      } else if (ext === 'html' || ext === 'htm') {
+        badgeClass = 'doc-badge-html';
+        iconText = 'HTML';
+      } else if (ext === 'png') {
+        badgeClass = 'doc-badge-png';
+        iconText = 'PNG';
+      } else if (ext === 'jpg' || ext === 'jpeg') {
+        badgeClass = 'doc-badge-png';
+        iconText = 'JPG';
       }
 
       const metaParts = [formatBytes(d.file_size)];
@@ -598,6 +607,23 @@ window.inspectDoc = async function (docId) {
         .join('');
     } else {
       colsBar.innerHTML = '';
+    }
+
+    // Image preview for PNG / visual assets
+    const imgPreviewContainer = document.getElementById('dataset-image-preview');
+    const imgEl = document.getElementById('dataset-preview-img');
+    const ext = (doc.file_type || '').toLowerCase();
+    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext) || /\.(png|jpe?g|webp|gif)$/i.test(doc.file_name || '');
+
+    if (imgPreviewContainer && imgEl) {
+      if (isImage && doc.file_data_base64) {
+        const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        imgEl.src = `data:${mime};base64,${doc.file_data_base64}`;
+        imgPreviewContainer.style.display = 'block';
+      } else {
+        imgEl.src = '';
+        imgPreviewContainer.style.display = 'none';
+      }
     }
 
     const contentBox = document.getElementById('dataset-modal-content');

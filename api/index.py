@@ -437,6 +437,90 @@ def parse_project_file(file_name: str, raw_bytes: bytes) -> Dict[str, Any]:
         except Exception as e:
             extracted_text = f"# PDF Document: {file_name}\nError parsing PDF: {str(e)}"
 
+    elif ext in ("html", "htm"):
+        try:
+            try:
+                html_raw = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                html_raw = raw_bytes.decode("latin-1", errors="replace")
+
+            # Extract page title
+            title_match = re.search(r"<title[^>]*>(.*?)</title>", html_raw, re.IGNORECASE | re.DOTALL)
+            page_title = title_match.group(1).strip() if title_match else file_name
+
+            # Strip scripts, styles, and head tags for clean semantic text
+            no_scripts = re.sub(r"<(script|style|head)[^>]*>.*?</\1>", " ", html_raw, flags=re.DOTALL | re.IGNORECASE)
+
+            # Extract headings
+            headings = re.findall(r'<h([1-6])[^>]*>(.*?)</h\1>', no_scripts, flags=re.IGNORECASE | re.DOTALL)
+            clean_headings = [f"H{lvl}: {re.sub(r'<[^>]+>', '', text).strip()}" for lvl, text in headings if text.strip()][:10]
+
+            # Extract links
+            links = re.findall(r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', no_scripts, flags=re.IGNORECASE | re.DOTALL)
+            clean_links = [f"[{re.sub(r'<[^>]+>', '', t).strip()}]({h.strip()})" for h, t in links if t.strip() and not h.startswith("#")][:15]
+
+            # Clean and normalize text
+            clean_text = re.sub(r"<[^>]+>", " ", no_scripts)
+            clean_text = re.sub(r"\s+", " ", clean_text).strip()
+
+            lines = [
+                f"# HTML Document: {file_name}",
+                f"- **Title:** {page_title}",
+                f"- **File Size:** {len(raw_bytes):,} bytes",
+            ]
+            if clean_headings:
+                lines.extend(["", "### Key Headings", "\n".join(f"- {h}" for h in clean_headings)])
+            if clean_links:
+                lines.extend(["", "### Key Referenced Links", "\n".join(f"- {l}" for l in clean_links)])
+            lines.extend(["", "### Extracted Document Text", clean_text[:25000]])
+
+            extracted_text = "\n".join(lines)
+            columns = ["Element", "Extracted Value"]
+            sample_rows = [
+                ["Page Title", page_title],
+                ["Headings Count", str(len(headings))],
+                ["Links Count", str(len(links))],
+            ]
+            row_count = len(clean_headings) + len(clean_links)
+            page_count = 1
+        except Exception as e:
+            extracted_text = f"# HTML Document: {file_name}\nError parsing HTML: {str(e)}"
+
+    elif ext in ("png", "jpg", "jpeg", "webp"):
+        width, height = 0, 0
+        img_format = ext.upper()
+        mode = "RGBA"
+        try:
+            from PIL import Image
+            img = Image.open(io.BytesIO(raw_bytes))
+            width, height = img.size
+            img_format = img.format or ext.upper()
+            mode = img.mode
+        except Exception:
+            # Deterministic pure-Python PNG header parser fallback (IHDR chunk at byte 12)
+            if ext == "png" and len(raw_bytes) >= 24 and raw_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+                width = int.from_bytes(raw_bytes[16:20], 'big')
+                height = int.from_bytes(raw_bytes[20:24], 'big')
+
+        res_str = f"{width} x {height} px" if width and height else "Dynamic Resolution"
+        page_count = 1
+        row_count = 1
+        columns = ["Property", "Specification"]
+        sample_rows = [
+            ["Asset Type", f"{img_format} Visual Asset"],
+            ["Resolution", res_str],
+            ["Color Mode", mode],
+            ["File Size", f"{len(raw_bytes):,} bytes"]
+        ]
+        extracted_text = (
+            f"# Visual Image Asset: {file_name}\n"
+            f"- **Asset Format:** {img_format}\n"
+            f"- **Resolution:** {res_str}\n"
+            f"- **Color Mode:** {mode}\n"
+            f"- **File Size:** {len(raw_bytes):,} bytes\n"
+            f"- **Harness Description:** Visual design mockup / screenshot / reference asset attached to project harness for multimodal agent inspection, visual verification, and UI layout audit."
+        )
+
     else:
         try:
             extracted_text = raw_bytes.decode("utf-8", errors="replace")[:25000]
@@ -596,7 +680,7 @@ async def health():
         "version": "3.1.0",
         "supabase_ready": bool(SUPABASE_URL and SUPABASE_ANON_KEY),
         "cloud_llm_ready": bool(os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")),
-        "harness_formats": ["pdf", "csv", "xlsx", "txt", "json"],
+        "harness_formats": ["pdf", "csv", "xlsx", "txt", "json", "html", "png"],
         "supported_llms": list(LLM_PROVIDERS_CATALOG.keys()),
     }
 

@@ -127,7 +127,7 @@
             <div class="row-between" style="margin-bottom:0.75rem;">
               <div>
                 <h3>Upload Core Project Data Harness</h3>
-                <p class="subtext" style="margin:0;">Upload PDF documents, CSV lead lists, or Excel (XLSX) sheets. Agents use these files as authoritative project ground truth.</p>
+                <p class="subtext" style="margin:0;">Upload PDF documents, CSV lead lists, Excel (XLSX) sheets, HTML pages, or PNG visual assets. Agents use these files as authoritative project ground truth.</p>
               </div>
               <span class="step-chip" id="doc-count-badge">0 Files Attached</span>
             </div>
@@ -136,8 +136,8 @@
             <div id="drop-zone" class="drop-zone">
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent); margin-bottom:0.5rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               <p style="font-weight:600; font-size:0.92rem; margin-bottom:0.25rem;">Choose or drag & drop project data files</p>
-              <p class="subtext" style="font-size:0.8rem; margin-bottom:0.75rem;">Supported: .csv, .xlsx, .pdf, .txt, .json (max 20MB)</p>
-              <input type="file" id="doc-file-input" multiple accept=".pdf,.csv,.xlsx,.xls,.txt,.json" style="display:none;" />
+              <p class="subtext" style="font-size:0.8rem; margin-bottom:0.75rem;">Supported: .csv, .xlsx, .pdf, .txt, .json, .html, .png (max 20MB)</p>
+              <input type="file" id="doc-file-input" multiple accept=".pdf,.csv,.xlsx,.xls,.txt,.json,.html,.htm,.png,.jpg,.jpeg,.webp" style="display:none;" />
               <button type="button" class="btn-primary small" onclick="document.getElementById('doc-file-input').click()">Browse Files</button>
             </div>
 
@@ -605,6 +605,9 @@
         <button type="button" id="close-dataset-modal-btn" class="btn-secondary small">Close</button>
       </div>
       <div id="dataset-columns-bar" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+      <div id="dataset-image-preview" style="display:none; text-align:center; padding:0.75rem; background:var(--surface-alt); border-radius:8px; margin:0.75rem 0; max-height:300px; overflow:hidden; border:1px solid var(--border);">
+        <img id="dataset-preview-img" src="" alt="Visual Asset Preview" style="max-width:100%; max-height:280px; object-fit:contain; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.06);" />
+      </div>
       <div id="dataset-modal-content" style="flex:1; overflow-y:auto; margin:1rem 0; font-family:'JetBrains Mono', monospace; font-size:0.82rem; background:var(--surface-alt); padding:1rem; border-radius:8px; white-space:pre-wrap;"></div>
       <div class="row-between" style="margin-top:0.5rem;">
         <button type="button" id="ask-team-about-file-btn" class="btn-primary small">Ask Team About This File →</button>

@@ -179,6 +179,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .doc-badge-csv { background: #ECFDF5; color: #059669; }
 .doc-badge-xlsx { background: #EFF6FF; color: #2563EB; }
 .doc-badge-txt { background: #F1F5F9; color: #475569; }
+.doc-badge-html { background: #FEF3C7; color: #D97706; }
+.doc-badge-png { background: #F3E8FF; color: #9333EA; }
 .doc-title { font-weight: 600; font-size: 0.92rem; }
 .doc-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; display: flex; gap: 0.6rem; align-items: center; }
 .doc-actions { display: flex; align-items: center; gap: 0.5rem; }

@@ -17,6 +17,8 @@ def test_health_and_vault_encryption():
     assert "pdf" in data["harness_formats"]
     assert "csv" in data["harness_formats"]
     assert "xlsx" in data["harness_formats"]
+    assert "html" in data["harness_formats"]
+    assert "png" in data["harness_formats"]
 
     token = encrypt_secret("my_hostinger_password_123")
     assert token != "my_hostinger_password_123"
@@ -62,6 +64,43 @@ def test_csv_and_xlsx_harness_parsing():
     assert xlsx_parsed["row_count"] == 1
     assert "Decision Maker" in xlsx_parsed["columns"]
     assert "Valioz Health" in xlsx_parsed["extracted_text"]
+
+
+def test_html_and_png_harness_parsing():
+    # 1. Test HTML Parsing
+    html_content = b"""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Valioz Clinic Portal</title></head>
+    <body>
+        <h1>Lead Acquisition Guidelines</h1>
+        <h2>Regional Criteria</h2>
+        <p>Target Canadian healthcare clinics in Toronto and Vancouver with minimum 5 staff.</p>
+        <a href="https://valioz.com/pricing">Valioz Pricing</a>
+    </body>
+    </html>
+    """
+    html_parsed = parse_project_file("Valioz_Guidelines.html", html_content)
+    assert html_parsed["file_type"] == "html"
+    assert "Valioz Clinic Portal" in html_parsed["extracted_text"]
+    assert "H1: Lead Acquisition Guidelines" in html_parsed["extracted_text"]
+    assert "[Valioz Pricing](https://valioz.com/pricing)" in html_parsed["extracted_text"]
+    assert "Page Title" in html_parsed["sample_rows"][0][0]
+    assert html_parsed["sample_rows"][0][1] == "Valioz Clinic Portal"
+
+    # 2. Test PNG Parsing
+    from PIL import Image
+    im = Image.new("RGBA", (320, 240), color="blue")
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    png_parsed = parse_project_file("Valioz_Dashboard_Mockup.png", png_bytes)
+    assert png_parsed["file_type"] == "png"
+    assert "320 x 240 px" in png_parsed["extracted_text"]
+    assert png_parsed["page_count"] == 1
+    assert png_parsed["columns"] == ["Property", "Specification"]
+    assert any("Resolution" in row[0] and "320 x 240 px" in row[1] for row in png_parsed["sample_rows"])
 
 
 def test_llm_providers_catalog():
